@@ -344,14 +344,6 @@ void ScreenManager_Update_Hook(auto original, ScreenManager* _this)
         return chat_manager->OpenChannel(ChatChannelCategory::Private);
       }
     }
-
-    if (MapKey::IsDown(GameFunction::ActionView)) {
-      if (auto view_controller = ObjectFinder<FullScreenChatViewController>::Get(); view_controller) {
-        if (view_controller->_messageList && view_controller->_messageList->_inputField) {
-          return view_controller->_messageList->_inputField->ActivateInputField();
-        }
-      }
-    }
   }
 
   if (!Key::IsInputFocused()) {

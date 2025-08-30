@@ -9,11 +9,12 @@
 enum class ChatChannelCategory // TypeDefIndex: 11600
 {
   None            = -1,
-  Global          = 0,
-  Alliance        = 1,
-  Private         = 2,
-  Private_Message = 3,
-  Block           = 4
+  Newbie          = 0,
+  Global          = 1,
+  Alliance        = 2,
+  Private         = 3,
+  Private_Message = 4,
+  Block           = 5
 };
 
 enum class ChatViewMode {
