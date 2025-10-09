@@ -1,6 +1,6 @@
 set_project("stfc-community-patch")
 
-set_languages("c++20")
+set_languages("c++23")
 
 set_runtimes("MT") -- Set the default build to multi-threaded static
 
@@ -8,7 +8,9 @@ add_requires("eastl")
 add_requires("spdlog")
 add_requires("toml++")
 add_requires("nlohmann_json")
-add_requires("libcurl", { configs = { zlib = true } })
+add_requires("cpr")
+add_requireconfs("cpr.libcurl", { configs = { zlib = true } })
+add_requires("boost", { configs = { url = true } })
 add_requires("protobuf-cpp")
 
 if is_plat("windows") then

@@ -1,9 +1,10 @@
 #include "config.h"
+#include "file.h"
 #include "patches/mapkey.h"
 #include "prime/KeyCode.h"
 #include "str_utils.h"
 #include "version.h"
-#include <prime\Toast.h>
+#include <prime/Toast.h>
 
 #include <EASTL/tuple.h>
 #include <spdlog/spdlog.h>
@@ -11,10 +12,9 @@
 #include <algorithm>
 #include <cstdio>
 #include <iostream>
+#include <ranges>
 #include <string>
 #include <string_view>
-
-#include "file.h"
 
 static const eastl::tuple<const char*, int> bannerTypes[] = {
     {"Standard", ToastState::Standard},
@@ -38,20 +38,49 @@ static const eastl::tuple<const char*, int> bannerTypes[] = {
     {"AbandonedTerritory", ToastState::AbandonedTerritory},
     {"TakeoverVictory", ToastState::TakeoverVictory},
     {"TakeoverDefeat", ToastState::TakeoverDefeat},
+    {"TreasuryProgress", ToastState::TreasuryProgress},
+    {"TreasuryFull", ToastState::TreasuryFull},
+    {"Achievement", ToastState::Achievement},
+    {"AssaultVictory", ToastState::AssaultVictory},
+    {"AssaultDefeat", ToastState::AssaultDefeat},
+    {"ChallengeComplete", ToastState::ChallengeComplete},
+    {"ChallengeFailed", ToastState::ChallengeFailed},
+    {"StrikeHit", ToastState::StrikeHit},
+    {"StrikeDefeat", ToastState::StrikeDefeat},
+    {"WarchestProgress", ToastState::WarchestProgress},
+    {"WarchestFull", ToastState::WarchestFull},
+    {"PartialVictory", ToastState::PartialVictory},
+    {"ArenaTimeLeft", ToastState::ArenaTimeLeft},
+    {"ChainedEventScored", ToastState::ChainedEventScored},
+    {"FleetPresetApplied", ToastState::FleetPresetApplied},
+    {"SurgeWarmUpEnded", ToastState::SurgeWarmUpEnded},
+    {"SurgeHostileGroupDefeated", ToastState::SurgeHostileGroupDefeated},
+    {"SurgeTimeLeft", ToastState::SurgeTimeLeft},
 };
+
+bool SyncConfig::enabled(SyncConfig::Type type) const
+{
+  for (const auto& opt : SyncOptions) {
+    if (opt.type == type) {
+      return this->*opt.option;
+    }
+  }
+
+  return false;
+}
 
 Config::Config()
 {
   Load();
 }
 
-void Config::Save(toml::table config, std::string_view filename, bool apply_warning)
+void Config::Save(const toml::table& config, const std::string_view filename, bool apply_warning)
 {
   std::ofstream config_file;
 
   auto config_path = File::MakePath(filename, true);
-
   config_file.open(config_path);
+
   if (apply_warning) {
     char defaultFile[255], configFile[255];
     snprintf(defaultFile, 255, "%s", File::Default());
@@ -142,7 +171,7 @@ float Config::GetDPI()
     auto horizontalScale = ((double)cxPhysical / (double)cxLogical);
     auto verticalScale   = ((double)cyPhysical / (double)cyLogical);
 
-    spdlog::trace("Horizonzal scaling: {}", horizontalScale);
+    spdlog::trace("Horizontal scaling: {}", horizontalScale);
     spdlog::trace("Vertical scaling: {}", verticalScale);
 
     dpi         = horizontalScale;
@@ -190,7 +219,7 @@ void Config::AdjustUiViewerScale(bool scaleUp)
   }
 }
 
-std::string get_config_type_as_string(toml::node_type type)
+std::string get_config_type_as_string(const toml::node_type type)
 {
   switch (type) {
     case toml::node_type::none:
@@ -219,8 +248,8 @@ std::string get_config_type_as_string(toml::node_type type)
 }
 
 template <typename T>
-inline T get_config_or_default(toml::table config, toml::table& new_config, std::string_view section,
-                               std::string_view item, T default_value)
+T get_config_or_default(toml::table& config, toml::table& new_config, std::string_view section, std::string_view item,
+                        T default_value)
 {
   new_config.emplace<toml::table>(section, toml::table());
 
@@ -243,7 +272,8 @@ inline T get_config_or_default(toml::table config, toml::table& new_config, std:
   return (T)final_value;
 }
 
-void read_sync_targets(toml::table config, toml::table& new_config, std::map<std::string, std::string>& sync_targets)
+void read_sync_targets(toml::table& config, toml::table& new_config,
+                       std::map<std::string, SyncTargetConfig>& sync_targets, const SyncConfig& defaults)
 {
   if (!config.contains("sync")) {
     return;
@@ -259,32 +289,51 @@ void read_sync_targets(toml::table config, toml::table& new_config, std::map<std
     return;
   }
 
-  for (const auto& sync_iter : *targets) {
-    if (!sync_iter.second.is_table()) {
+  for (const auto& [target_key, target_config] : *targets) {
+    if (!target_config.is_table()) {
       continue;
     }
 
-    const auto& values = *sync_iter.second.as_table();
-    if (!values.contains("url") || !values.contains("token")) {
+    const std::string target_section = "sync.targets." + std::string(target_key.str());
+
+    SyncTargetConfig target;
+    toml::table      parsed_target;
+
+    const auto& values = *target_config.as_table();
+    if (values.contains("url") && values.contains("token")) {
+      auto url   = values["url"].value<std::string>();
+      auto token = values["token"].value<std::string>();
+      auto proxy = values["proxy"].value<std::string>();
+
+      if (!url.has_value() || !token.has_value()) {
+        continue;
+      }
+
+      target.url   = url.value();
+      target.token = token.value();
+      target.proxy = proxy.value_or(defaults.proxy);
+
+      parsed_target.insert("url", target.url);
+      parsed_target.insert("token", target.token);
+      parsed_target.insert("proxy", target.proxy);
+    } else {
+      spdlog::warn("Skipping invalid target [{}]. Missing url or token.", target_section);
       continue;
     }
 
-    auto key   = sync_iter.first.str();
-    auto url   = values["url"].value<std::string>();
-    auto token = values["token"].value<std::string>();
-
-    if (!url.has_value() || !token.has_value()) {
-      continue;
+    for (const auto& opt : SyncOptions) {
+      target.*opt.option = values[opt.option_str].value<bool>().value_or(defaults.*opt.option);
+      parsed_target.insert(opt.option_str, target.*opt.option);
     }
-    if (sync_targets.emplace(url.value(), token.value()).second) {
-      new_config["sync"]["targets"].as_table()->emplace<toml::table>(
-          key, toml::table{{"url", url.value()}, {"token", token.value()}});
-      spdlog::debug("config value sync.targets.{} url: {}, token: {}", key, url.value(), token.value());
+
+    if (sync_targets.emplace(target_key.str(), target).second) {
+      new_config["sync"]["targets"].as_table()->emplace<toml::table>(target_key.str(), parsed_target);
+      spdlog::debug("config value {} url: {}, token: {}", target_section, target.url, target.token);
     }
   }
 }
 
-void parse_config_shortcut(toml::table config, toml::table& new_config, std::string_view item,
+void parse_config_shortcut(toml::table& config, toml::table& new_config, std::string_view item,
                            GameFunction gameFunction, std::string_view default_value)
 {
   auto section = "shortcuts";
@@ -499,42 +548,35 @@ void Config::Load()
 
   this->always_skip_reveal_sequence = get_config_or_default(config, parsed, "ui", "always_skip_reveal_sequence", false);
 
-  // must explicitly include std::string typing here, or we get back char * which fails us!
-  std::string disabled_banner_types_str =
-      get_config_or_default<std::string>(config, parsed, "ui", "disabled_banner_types", "");
-
   spdlog::debug("");
 
-  this->sync_proxy = get_config_or_default<std::string>(config, parsed, "sync", "proxy", "");
-  this->sync_file  = get_config_or_default<std::string>(config, parsed, "sync", "file", "");
+  this->sync_debug              = get_config_or_default(config, parsed, "sync", "debug", false);
+  this->sync_logging            = get_config_or_default(config, parsed, "sync", "logging", false);
+  this->sync_resolver_cache_ttl = get_config_or_default(config, parsed, "sync", "resolver_cache_ttl", 300);
 
-  this->sync_debug      = get_config_or_default(config, parsed, "sync", "debug", false);
-  this->sync_logging    = get_config_or_default(config, parsed, "sync", "logging", false);
-  this->sync_battlelogs = get_config_or_default(config, parsed, "sync", "battlelogs", false);
-  this->sync_resources  = get_config_or_default(config, parsed, "sync", "resources", false);
-  this->sync_officer    = get_config_or_default(config, parsed, "sync", "officer", false);
-  this->sync_missions   = get_config_or_default(config, parsed, "sync", "missions", false);
-  this->sync_research   = get_config_or_default(config, parsed, "sync", "research", false);
-  this->sync_tech       = get_config_or_default(config, parsed, "sync", "tech", false);
-  this->sync_traits     = get_config_or_default(config, parsed, "sync", "traits", false);
-  this->sync_buildings  = get_config_or_default(config, parsed, "sync", "buildings", false);
-  this->sync_ships      = get_config_or_default(config, parsed, "sync", "ships", false);
+  SyncConfig sync_defaults;
+  sync_defaults.proxy = get_config_or_default<std::string>(config, parsed, "sync", "proxy", "");
+
+  for (const auto& opt : SyncOptions) {
+    sync_defaults.*opt.option = get_config_or_default(config, parsed, "sync", opt.option_str, false);
+  }
 
   spdlog::debug("");
 
   parsed["sync"].as_table()->emplace<toml::table>("targets", toml::table());
-
-  read_sync_targets(config, parsed, this->sync_targets);
+  read_sync_targets(config, parsed, this->sync_targets, sync_defaults);
 
   // handle legacy sync options
   auto sync_url   = config["sync"]["url"].value<std::string>();
   auto sync_token = config["sync"]["token"].value<std::string>();
 
   if (sync_url.has_value() && sync_token.has_value()) {
-    spdlog::warn("Depreciation Warning: Legacy config options 'sync_url' and 'sync_token' have been moved to "
+    spdlog::warn("Deprecation Warning: Legacy config options 'sync_url' and 'sync_token' have been moved to "
                  "[sync.targets.<name>] sections and may be removed in a future version.");
 
-    if (this->sync_targets.emplace(sync_url.value(), sync_token.value()).second) {
+    SyncTargetConfig converted_target{.url = sync_url.value(), .token = sync_token.value()};
+
+    if (this->sync_targets.emplace("default", converted_target).second) {
       parsed["sync"]["targets"].as_table()->emplace<toml::table>(
           "default", toml::table{{"url", sync_url.value()}, {"token", sync_token.value()}});
       spdlog::info(
@@ -547,7 +589,25 @@ void Config::Load()
     }
   }
 
+  if (auto sync_file = config["sync"]["file"].value<std::string>();
+      sync_file.has_value() && !sync_file.value().empty()) {
+    spdlog::error("Deprecation Notice: The 'sync_file' config option has been deprecated and removed. "
+                  "For capturing sync output, please use a local HTTP server instead.");
+  }
+
+  // set global sync options to what's actually used in targets
+  const auto targets_view = this->sync_targets | std::views::values;
+
+  for (const auto& opt : SyncOptions) {
+    this->sync_options.*opt.option =
+        std::ranges::any_of(targets_view, [opt](const auto& target) { return target.*opt.option; });
+  }
+
   spdlog::debug("");
+
+  // must explicitly include std::string typing here, or we get back char * which fails us!
+  auto disabled_banner_types_str =
+      get_config_or_default<std::string>(config, parsed, "ui", "disabled_banner_types", "");
 
   this->config_settings_url = get_config_or_default<std::string>(config, parsed, "config", "settings_url", "");
   this->config_assets_url_override =
@@ -557,7 +617,7 @@ void Config::Load()
 
   spdlog::debug("");
 
-  std::string       bannerString = "";
+  std::string       bannerString;
   std::stringstream message;
   message << "Parsing banner strings";
 
@@ -572,7 +632,7 @@ void Config::Load()
 
       if (upper_key == upper_type) {
         this->disabled_banner_types.emplace_back(value);
-        if (bannerString.length() != 0) {
+        if (!bannerString.empty()) {
           bannerString.append(", ");
         }
         bannerString.append(key);
@@ -716,7 +776,6 @@ void Config::Load()
     std::filesystem::remove(FILE_DEF_PARSED);
   }
 
-  
   Config::Save(parsed, File::Vars());
 
   std::cout << "\n\n-----------------------------\n\n"
@@ -734,5 +793,4 @@ void Config::Load()
             << "\n\nPlease see https://github.com/netniv/stfc-mod for latest configuration help, examples and future "
                "releases\n"
             << "or visit the STFC Community Mod discord server at https://discord.gg/PrpHgs7Vjs\n\n";
-
 }
