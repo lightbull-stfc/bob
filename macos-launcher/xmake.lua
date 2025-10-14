@@ -37,8 +37,8 @@ do
             local patch = content:match("#define VERSION_PATCH%s+(%d+)")
             if major and minor and revision and patch then
                 version = major .. "." .. minor .. "." .. revision .. "." .. patch
-            else if major and minor and revision then
-                version = major .. "." .. minor .. "." .. revision .. "." .. 0
+            elseif major and minor and revision then
+                version = major .. "." .. minor .. "." .. revision .. ".0"
             else
                 print("::warning file=" .. version_file .. "::unable to parse, using default version 1.0.0.0")
             end
