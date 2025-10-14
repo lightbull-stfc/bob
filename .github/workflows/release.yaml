@@ -1,17 +1,21 @@
-on:
-  push:
-    tags:
-      - "v*"
-
 name: Create Release
+
+on:
+  workflow_run:
+    workflows: ["Build"]
+    types:
+      - completed
 
 jobs:
   deploy:
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: |
+      github.event.workflow_run.conclusion == 'success' &&
+      startsWith(github.ref, 'refs/tags/v')
     permissions:
       contents: write
-    name: Create Release
     runs-on: ubuntu-latest
+    name: Create Release
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -35,16 +39,14 @@ jobs:
       - name: Download artifact
         uses: dawidd6/action-download-artifact@v6
         with:
-          commit: ${{env.GITHUB_SHA}}
-          workflow: ci.yaml
+          run_id: ${{ github.event.workflow_run.id }}
           workflow_conclusion: success
 
       - name: Package
         run: |
           (cd stfc-community-patch && zip -r - .) > stfc-community-patch.zip
 
-      - name: Upload Community Patch
-        id: upload-patch
+      - name: Upload Community Patch - Standard
         uses: shogo82148/actions-upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -54,8 +56,7 @@ jobs:
           asset_name: stfc-community-patch.zip
           asset_content_type: application/zip
 
-      - name: Upload Community Patch
-        id: upload-patch-versioned
+      - name: Upload Community Patch - Versioned
         uses: shogo82148/actions-upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -65,8 +66,7 @@ jobs:
           asset_name: stfc-community-patch-${{ github.ref_name }}.zip
           asset_content_type: application/zip
 
-      - name: Upload Community Patch Mac Installer
-        id: upload-patch-macos
+      - name: Upload Community Patch - Mac Installer
         uses: shogo82148/actions-upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
