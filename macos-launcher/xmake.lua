@@ -1,24 +1,5 @@
 add_rules("mode.debug", "mode.release")
 
--- Function to extract version from version.h
-function get_version_from_header()
-    local version_file = path.join(os.scriptdir(), "../mods/src/version.h")
-    if not os.isfile(version_file) then
-        return "1.0.0.0"
-    end
-
-    local content = io.readfile(version_file)
-    local major = content:match("#define VERSION_MAJOR%s+(%d+)")
-    local minor = content:match("#define VERSION_MINOR%s+(%d+)")
-    local revision = content:match("#define VERSION_REVISION%s+(%d+)")
-    local patch = content:match("#define VERSION_PATCH%s+(%d+)")
-
-    if major and minor and revision and patch then
-        return major .. "." .. minor .. "." .. revision .. "." .. patch
-    end
-    return "1.0.0.0"
-end
-
 target("macOSLauncher")
 do
     add_rules("xcode.application")
@@ -26,7 +7,6 @@ do
 
     add_files("src/**/*.swift")
     add_files("src/*.swift", "src/*.xcassets")
-    add_files("src/Info.plist")
     add_files("deps/PlzmaSDK/swift/*.swift")
     add_files("src/*.cc")
 
@@ -41,13 +21,37 @@ do
 
     -- Generate Info.plist from template during configuration
     on_config(function (target)
-        local version = get_version_from_header()
+        local version_file = path.join(os.scriptdir(), "../mods/src/version.h")
+        if not os.isfile(version_file) then
+            -- GitHub Actions warning
+            print("::warning file=" .. version_file .. "::version.h not found, using default version 1.0.0.0")
+            version_file = nil
+        end
+
+        local version = "1.0.0.0"
+        if version_file then
+            local content = io.readfile(version_file)
+            local major = content:match("#define VERSION_MAJOR%s+(%d+)")
+            local minor = content:match("#define VERSION_MINOR%s+(%d+)")
+            local revision = content:match("#define VERSION_REVISION%s+(%d+)")
+            local patch = content:match("#define VERSION_PATCH%s+(%d+)")
+            if major and minor and revision and patch then
+                version = major .. "." .. minor .. "." .. revision .. "." .. patch
+            else if major and minor and revision then
+                version = major .. "." .. minor .. "." .. revision .. "." .. 0
+            else
+                print("::warning file=" .. version_file .. "::unable to parse, using default version 1.0.0.0")
+            end
+        end
+
+        -- Generate Info.plist
         local info_plist_template = path.join(os.scriptdir(), "src/Info.plist.template")
         local info_plist_output = path.join(os.scriptdir(), "src/Info.plist")
 
         if os.isfile(info_plist_template) then
             -- Read the template
             local content = io.readfile(info_plist_template)
+
             -- Replace ${VERSION} placeholder with actual version
             content = content:gsub("${VERSION}", version)
 
@@ -55,7 +59,7 @@ do
             io.writefile(info_plist_output, content)
             print("Generated Info.plist with version: " .. version)
         else
-            print("Warning: Info.plist.template not found at " .. info_plist_template)
+            print("::warning file=" .. info_plist_template .. "::Info.plist.template not found, skipping generation")
         end
     end)
 
