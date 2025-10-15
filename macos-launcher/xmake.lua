@@ -3,7 +3,7 @@ add_rules("mode.debug", "mode.release")
 target("macOSLauncher")
     add_rules("xcode.application")
     set_kind("binary")
-    set_basename("STFC Community Mod")
+    set_basename("macOSLauncher")
 
     add_files("src/**/*.swift")
     add_files("src/*.swift", "src/*.xcassets")
