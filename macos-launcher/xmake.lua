@@ -73,4 +73,3 @@ target("macOSLauncher")
             print("Cleaned generated Info.plist")
         end
     end)
-end
