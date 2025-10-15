@@ -15,9 +15,11 @@ target("macOSLauncher")
 
     add_values("xcode.bundle_identifier", "com.stfcmod.startrekpatch")
     add_values("xcode.codesign_identity", "-")
-    add_scflags("-Xcc -fmodules", "-Xcc -fmodule-map-file=macos-launcher/src/module.modulemap", "-D SWIFT_PACKAGE",
-        { force = true })
     add_values("xcode.bundle_display_name", "Star Trek Fleet Command Community Mod")
+    add_values("xcode.product_name", "STFC Community Mod")
+    add_values("xcode.bundle_info_plist", "src/Info.plist")
+
+    add_scflags("-Xcc -fmodules", "-Xcc -fmodule-map-file=macos-launcher/src/module.modulemap", "-D SWIFT_PACKAGE", {force = true})
 
     -- Generate Info.plist from template during configuration
     on_config(function (target)
