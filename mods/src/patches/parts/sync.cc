@@ -28,6 +28,7 @@
 #include <EASTL/algorithm.h>
 #include <EASTL/bonus/ring_buffer.h>
 #include <cpr/cpr.h>
+#include <curl/curl.h>
 #include <nlohmann/json.hpp>
 
 #include <atomic>
@@ -35,11 +36,14 @@
 #include <condition_variable>
 #include <format>
 #include <fstream>
-#include <ostream>
+#include <mutex>
 #include <queue>
-#include <semaphore>
 #include <string>
 #include <string_view>
+#include <thread>
+#include <unordered_map>
+#include <unordered_set>
+#include <vector>
 
 #ifndef STR_FORMAT
 #if __cpp_lib_format
@@ -71,11 +75,11 @@ namespace headers
   static std::string    instanceSessionId;
   static int32_t        instanceId;
   static std::string    unityVersion{"6000.0.52f1"};
-  static std::string    primeVersion{"1.000.44468"};
+  static std::string    primeVersion{"1.000.45324"};
   static constexpr char poweredBy[] = "stfc community patch/" VER_FILE_VERSION_STR;
 } // namespace headers
 
-static std::string newUUID()
+[[nodiscard]] static std::string newUUID()
 {
 #ifdef _WIN32
   UUID uuid;
@@ -97,52 +101,72 @@ static std::string newUUID()
 }
 
 // Simple URL manipulation class to replace boost::url
-class SimpleUrl
+class Url
 {
 public:
-  explicit SimpleUrl(std::string_view urlString) : url(urlString)
+  explicit Url(const std::string& url) : m_url(url)
   {
-    // Find where the path starts (after scheme://host:port)
-    // Format: scheme://host[:port]/path[?query][#fragment]
-    
-    size_t schemeEnd = url.find("://");
-    if (schemeEnd == std::string::npos) {
-      pathStart = 0;
+    m_handle = curl_url();
+    if (m_handle) {
+      curl_url_set(m_handle, CURLUPART_URL, m_url.data(), 0);
+    }
+  }
+
+  ~Url()
+  {
+    if (m_handle) {
+      curl_url_cleanup(m_handle);
+    }
+  }
+
+  // Delete copy operations to prevent double-free
+  Url(const Url&) = delete;
+  Url& operator=(const Url&) = delete;
+
+  Url(Url&& other) noexcept : m_handle(other.m_handle), m_url(std::move(other.m_url))
+  {
+    other.m_handle = nullptr;
+  }
+
+  Url& operator=(Url&& other) noexcept
+  {
+    if (this != &other) {
+      if (m_handle) {
+        curl_url_cleanup(m_handle);
+      }
+      m_handle = other.m_handle;
+      m_url = std::move(other.m_url);
+      other.m_handle = nullptr;
+    }
+
+    return *this;
+  }
+  
+  void set_path(const std::string& path)
+  {
+    if (!m_handle)
       return;
-    }
-    
-    // Skip past "://"
-    size_t hostStart = schemeEnd + 3;
-    
-    // Find the start of the path (first '/' after host)
-    pathStart = url.find('/', hostStart);
-    if (pathStart == std::string::npos) {
-      pathStart = url.length();
+
+    if (CURLUcode rc = curl_url_set(m_handle, CURLUPART_PATH, path.c_str(), 0); rc == CURLUE_OK) {
+      char *url = nullptr;
+      if (rc = curl_url_get(m_handle, CURLUPART_URL , &url, CURLU_PUNYCODE); rc == CURLUE_OK) {
+        m_url = url;
+      }
+
+      if (url != nullptr) {
+        curl_free(url);
+      }
     }
   }
   
-  void setPath(std::string_view newPath)
+  const char* c_str() const
   {
-    // Remove existing path and everything after it
-    url.erase(pathStart);
-    
-    // Add new path (ensure it starts with '/')
-    if (!newPath.empty() && newPath[0] != '/') {
-      url += '/';
-    }
-    url += newPath;
-    
-    // pathStart remains valid since we erase from that position and append
-  }
-  
-  const char* data() const
-  {
-    return url.c_str();
+    return m_url.c_str();
   }
   
 private:
-  std::string url;
-  size_t pathStart;
+  CURLU *m_handle;
+  std::string m_url;
 };
 
 static void sync_log_error(const std::string& type, const std::string& target, const std::string& text)
@@ -183,139 +207,183 @@ static void sync_log_trace(const std::string& type, const std::string& target, c
 static const std::string CURL_TYPE_UPLOAD   = "UPLOAD";
 static const std::string CURL_TYPE_DOWNLOAD = "DOWNLOAD";
 
-std::mutex http_responses_mtx;
-std::condition_variable http_responses_cv;
-using response_queue_item_t = std::tuple<std::string, cpr::Response>;
-std::queue<response_queue_item_t> http_responses_queue;
+// Per-target worker thread infrastructure
+struct TargetWorker {
+  TargetWorker() = default;
+  TargetWorker(const TargetWorker&) = delete;
+  TargetWorker& operator=(const TargetWorker&) = delete;
 
-
-static std::shared_ptr<cpr::Session> get_curl_client_sync(const std::string& target)
-{
-  static std::unordered_map<std::string, std::shared_ptr<cpr::Session>> sessions_map;
-  static std::mutex                                                     sessions_map_mutex;
+  using request_t = std::tuple<std::string, std::string, bool>;
 
   std::shared_ptr<cpr::Session> session;
-  {
-    std::lock_guard lk(sessions_map_mutex);
+  std::thread                   worker_thread;
+  std::atomic<bool>             stop_requested{false};
+  std::queue<request_t>         request_queue;
+  std::mutex                    queue_mtx;
+  std::condition_variable       queue_cv;
+};
 
-    if (!sessions_map.contains(target)) {
-      session                   = std::make_shared<cpr::Session>();
-      const auto& target_config = Config::Get().sync_targets[target];
+static std::unordered_map<std::string, std::shared_ptr<TargetWorker>> target_workers;
+static std::mutex target_workers_mtx;
 
-      session->SetUrl(target_config.url);
-      session->SetUserAgent("stfc community patch " VER_FILE_VERSION_STR " (libcurl/" LIBCURL_VERSION ")");
-      session->SetAcceptEncoding(cpr::AcceptEncoding{});
-      session->SetHttpVersion(cpr::HttpVersion{cpr::HttpVersionCode::VERSION_1_1});
-      session->SetRedirect(cpr::Redirect{3, true, false, cpr::PostRedirectFlags::POST_ALL});
+static void target_worker_thread(std::shared_ptr<TargetWorker> worker)
+{
+#if _WIN32
+  WinRtApartmentGuard apartmentGuard;
+#endif
 
-      if (!target_config.proxy.empty()) {
-        session->SetProxies({{"http", target_config.proxy}, {"https", target_config.proxy}});
+  while (!worker->stop_requested.load(std::memory_order_acquire)) {
+    std::string identifier;
+    std::string post_data;
+    bool is_first_sync = false;
 
-        // TODO: Is this too permissive?
-        session->SetSslOptions(cpr::Ssl(
-          cpr::ssl::VerifyHost{false},
-          cpr::ssl::VerifyPeer{false},
-          cpr::ssl::NoRevoke{true})
-        );
-      }
-
-      session->SetHeader({
-          {"Content-Type", "application/json"},
-          {"X-Powered-By", headers::poweredBy},
-          {"stfc-sync-token", target_config.token},
+    {
+      std::unique_lock lk(worker->queue_mtx);
+      worker->queue_cv.wait(lk, [&worker] {
+        return worker->stop_requested.load(std::memory_order_acquire) || !worker->request_queue.empty();
       });
 
-      sessions_map[target] = session;
-    } else {
-      session = sessions_map[target];
+      if (worker->stop_requested.load(std::memory_order_acquire) && worker->request_queue.empty()) {
+        break;
+      }
+
+      if (!worker->request_queue.empty()) {
+        auto item = std::move(worker->request_queue.front());
+        worker->request_queue.pop();
+        identifier = std::move(std::get<0>(item));
+        post_data = std::move(std::get<1>(item));
+        is_first_sync = std::get<2>(item);
+      }
+    }
+
+    if (post_data.empty()) {
+      continue;
+    }
+
+    // Process the request
+    try {
+      const auto httpClient = worker->session;
+      auto& headers = httpClient->GetHeader();
+
+      if (is_first_sync) {
+        headers.insert_or_assign("X-PRIME-SYNC", "2");
+        sync_log_trace(CURL_TYPE_UPLOAD, identifier, "Adding X-Prime-Sync header for initial sync");
+      } else {
+        headers.erase("X-PRIME-SYNC");
+      }
+
+      httpClient->SetBody(cpr::Body{post_data});
+
+      sync_log_debug(CURL_TYPE_UPLOAD, identifier, "Sending data to " + httpClient->GetFullRequestUrl());
+
+      // Synchronously wait for response
+      const auto response = httpClient->Post();
+
+      if (response.status_code == 0) {
+        sync_log_error(CURL_TYPE_UPLOAD, identifier, "Failed to send request: " + response.error.message);
+      } else if (response.status_code >= 400) {
+        sync_log_error(CURL_TYPE_UPLOAD, identifier, STR_FORMAT("Failed to communicate with server: {} (after {:.1f}s)", response.status_line, response.elapsed));
+      } else {
+        sync_log_debug(CURL_TYPE_UPLOAD, identifier, STR_FORMAT("Response: {} ({:.1f}s elapsed)", response.status_line, response.elapsed));
+      }
+    } catch (const std::runtime_error& e) {
+      ErrorMsg::SyncRuntime(identifier.c_str(), e);
+    } catch (const std::exception& e) {
+      ErrorMsg::SyncException(identifier.c_str(), e);
+#if _WIN32
+    } catch (winrt::hresult_error const& ex) {
+      ErrorMsg::SyncWinRT(identifier.c_str(), ex);
+#endif
+    } catch (...) {
+      ErrorMsg::SyncMsg(identifier.c_str(), "Unknown error occurred");
+    }
+  }
+}
+
+static std::shared_ptr<TargetWorker> get_curl_client_sync(const std::string& target)
+{
+  std::lock_guard lk(target_workers_mtx);
+
+  // Check if a worker already exists
+  if (const auto it = target_workers.find(target); it != target_workers.end()) {
+    return it->second;
+  }
+
+  // Create a new worker for this target
+  auto worker = std::make_shared<TargetWorker>();
+
+  // Initialize session
+  worker->session = std::make_shared<cpr::Session>();
+  const auto& target_config = Config::Get().sync_targets[target];
+
+  worker->session->SetUrl(target_config.url);
+  worker->session->SetUserAgent("stfc community patch " VER_FILE_VERSION_STR " (libcurl/" LIBCURL_VERSION ")");
+  worker->session->SetAcceptEncoding(cpr::AcceptEncoding{});
+  worker->session->SetHttpVersion(cpr::HttpVersion{cpr::HttpVersionCode::VERSION_1_1});
+  worker->session->SetRedirect(cpr::Redirect{3, true, false, cpr::PostRedirectFlags::POST_ALL});
+
+#ifndef _MODDBG
+  worker->session->SetConnectTimeout(cpr::ConnectTimeout{3'000});
+  worker->session->SetTimeout(cpr::Timeout{10'000});
+#endif
+
+  if (!target_config.proxy.empty()) {
+    worker->session->SetProxies({{"http", target_config.proxy}, {"https", target_config.proxy}});
+
+    if (!target_config.verify_ssl) {
+      worker->session->SetSslOptions(
+        cpr::Ssl(cpr::ssl::VerifyHost{false}, cpr::ssl::VerifyPeer{false}, cpr::ssl::NoRevoke{true})
+      );
     }
   }
 
-  return session;
+  worker->session->SetHeader({
+    {"Content-Type", "application/json"},
+    {"X-Powered-By", headers::poweredBy},
+    {"stfc-sync-token", target_config.token},
+  });
+
+  // Start the worker thread
+  worker->worker_thread = std::thread(target_worker_thread, worker);
+  target_workers[target] = worker;
+
+  return worker;
 }
 
-static void send_data(SyncConfig::Type type, const std::string& post_data)
+static void send_data(SyncConfig::Type type, const std::string& post_data, bool is_first_sync)
 {
-  using sem_ptr = std::shared_ptr<std::counting_semaphore<1>>;
-  static std::unordered_map<std::string, sem_ptr> client_semaphores;
-  static std::mutex                               client_sync_map_guard;
-  static std::once_flag                           init_once;
-
+  static std::once_flag init_once;
   std::call_once(init_once, []() {
     const auto& targets = Config::Get().sync_targets;
     if (targets.empty()) {
       sync_log_warn(CURL_TYPE_UPLOAD, "GLOBAL", "No target found, will not attempt to send");
-    } else {
-      client_semaphores.reserve(targets.size());
-      for (const auto& target : targets | std::views::keys) {
-        client_semaphores.emplace(target, std::make_shared<std::counting_semaphore<1>>(1));
-      }
     }
   });
 
-  for (const auto& target : Config::Get().sync_targets | std::views::filter([type](const auto& t) { return t.second.enabled(type); }) | std::views::keys) {
-    // Get/create the per-target semaphore in a thread-safe manner.
-    sem_ptr target_sem;
-    {
-      std::lock_guard guard(client_sync_map_guard);
-      auto            it = client_semaphores.find(target);
-      if (it == client_semaphores.end()) {
-        it = client_semaphores.emplace(target, std::make_shared<std::counting_semaphore<1>>(1)).first;
-      }
-      target_sem = it->second;
-    }
+  for (const auto& target : Config::Get().sync_targets
+       | std::views::filter([type](const auto& t) { return t.second.enabled(type); })
+       | std::views::keys) {
 
     const auto target_identifier = STR_FORMAT("{} ({})", target, to_string(type));
-    bool acquired = false;
 
     try {
-      // Ensure only one in-flight operation per target.
-      target_sem->acquire();
-      acquired = true;
+      auto worker = get_curl_client_sync(target);
 
-      const auto httpClient = get_curl_client_sync(target);
-#ifndef _MODDBG
-      httpClient->SetConnectTimeout(cpr::ConnectTimeout{3000});
-      httpClient->SetTimeout(cpr::Timeout{10000});
-#endif
-      httpClient->SetBody(cpr::Body{post_data});
-
-      sync_log_debug(CURL_TYPE_UPLOAD, target_identifier, "Sending data to " + httpClient->GetFullRequestUrl());
-      auto asyncResponse = httpClient->PostAsync();
-
-      // Detach a waiter that enqueues the completed response and releases the semaphore.
-      std::thread([target_identifier, target_sem, ar = std::move(asyncResponse)]() mutable {
-        try {
-          auto response = ar.get();
-          {
-            std::lock_guard lk(http_responses_mtx);
-            http_responses_queue.emplace(target_identifier, std::move(response));
-          }
-          http_responses_cv.notify_all();
-        } catch (const std::runtime_error& e) {
-          ErrorMsg::SyncRuntime(target_identifier.c_str(), e);
-        } catch (const std::exception& e) {
-          ErrorMsg::SyncException(target_identifier.c_str(), e);
-#if _WIN32
-        } catch (winrt::hresult_error const& ex) {
-          ErrorMsg::SyncWinRT(target_identifier.c_str(), ex);
-#endif
-        } catch (...) {
-          ErrorMsg::SyncMsg(target_identifier.c_str(), "Unknown error occurred");
-        }
-        // Always release to allow the next send for this target.
-        try { target_sem->release(); } catch (...) {}
-      }).detach();
+      // Enqueue the request for this target's worker
+      {
+        std::lock_guard lk(worker->queue_mtx);
+        worker->request_queue.emplace(target_identifier, post_data, is_first_sync);
+        sync_log_trace(CURL_TYPE_UPLOAD, target_identifier,
+                       STR_FORMAT("Queued request (queue size: {})", worker->request_queue.size()));
+      }
+      worker->queue_cv.notify_one();
 
     } catch (const std::runtime_error& e) {
       spdlog::error("Failed to send sync data to target '{}' - Runtime error: {}", target_identifier, e.what());
-      if (acquired) { try { target_sem->release(); } catch (...) {} }
     } catch (const std::exception& e) {
       spdlog::error("Failed to send sync data to target '{}' - Exception: {}", target_identifier, e.what());
-      if (acquired) { try { target_sem->release(); } catch (...) {} }
     } catch (...) {
       spdlog::error("Failed to send sync data to target '{}' - Unknown error occurred", target_identifier);
-      if (acquired) { try { target_sem->release(); } catch (...) {} }
     }
   }
 }
@@ -323,8 +391,10 @@ static void send_data(SyncConfig::Type type, const std::string& post_data)
 static std::shared_ptr<cpr::Session> get_curl_client_scopely()
 {
   static std::shared_ptr<cpr::Session> session{nullptr};
+  static std::once_flag init_flag;
 
-  if (!session) {
+  // thread-safe initialization
+  std::call_once(init_flag, [] {
     session = std::make_shared<cpr::Session>();
     session->SetAcceptEncoding(cpr::AcceptEncoding{});
     session->SetHttpVersion(cpr::HttpVersion{cpr::HttpVersionCode::VERSION_1_1});
@@ -332,12 +402,11 @@ static std::shared_ptr<cpr::Session> get_curl_client_scopely()
     if (!Config::Get().sync_options.proxy.empty()) {
       session->SetProxies({{"https", Config::Get().sync_options.proxy}});
 
-      // TODO: Is this too permissive?
-      session->SetSslOptions(cpr::Ssl(
-        cpr::ssl::VerifyHost{false},
-        cpr::ssl::VerifyPeer{false},
-        cpr::ssl::NoRevoke{true}
-      ));
+      if (!Config::Get().sync_options.verify_ssl) {
+        session->SetSslOptions(
+          cpr::Ssl(cpr::ssl::VerifyHost{false}, cpr::ssl::VerifyPeer{false}, cpr::ssl::NoRevoke{true})
+        );
+      }
     }
 
     session->SetUserAgent("UnityPlayer/" + headers::unityVersion + " (UnityWebRequest/1.0, libcurl/8.10.1-DEV)");
@@ -352,7 +421,7 @@ static std::shared_ptr<cpr::Session> get_curl_client_scopely()
         {"X-Unity-Version", headers::unityVersion},
         {"X-Powered-By", headers::poweredBy},
     });
-  }
+  });
 
   return session;
 }
@@ -366,15 +435,17 @@ static std::string get_scopely_data(const std::string& path, const std::string& 
     }
   });
 
-  SimpleUrl url(headers::gameServerUrl);
-  url.setPath(path);
+  Url url(headers::gameServerUrl);
+  url.set_path(path);
 
   const auto        httpClient = get_curl_client_scopely();
   static std::mutex client_mutex;
 
+  std::string response_text;
+
   {
     std::lock_guard lk(client_mutex);
-    httpClient->SetUrl(url.data());
+    httpClient->SetUrl(url.c_str());
 
     auto& headers = httpClient->GetHeader();
     headers.insert_or_assign("X-TRANSACTION-ID", newUUID());
@@ -405,42 +476,12 @@ static std::string get_scopely_data(const std::string& path, const std::string& 
 
     sync_log_debug(CURL_TYPE_DOWNLOAD, path,
                    STR_FORMAT("Response: {} ({}), {:.1f}s elapsed,", response.status_line, type, response.elapsed));
-    return response.text;
+    response_text = response.text;
   }
 
-  return {};
+  return response_text;
 }
 
-static void handle_response_data()
-{
-#if _WIN32
-  WinRtApartmentGuard apartmentGuard;
-#endif
-
-  for (;;) {
-    std::string   target_identifier;
-    cpr::Response response;
-
-    {
-      std::unique_lock lk(http_responses_mtx);
-      http_responses_cv.wait(lk, []() { return !http_responses_queue.empty(); });
-
-      auto& tuple       = http_responses_queue.front();
-      target_identifier = std::move(std::get<0>(tuple));
-      response          = std::move(std::get<1>(tuple));
-      http_responses_queue.pop();
-    }
-
-    // Process a completed response
-    if (response.status_code == 0) {
-      sync_log_error(CURL_TYPE_UPLOAD, target_identifier, "Failed to send request: " + response.error.message);
-    } else if (response.status_code >= 400) {
-      sync_log_error(CURL_TYPE_UPLOAD, target_identifier, STR_FORMAT("Failed to communicate with server: {} (after {:.1f}s)", response.status_line, response.elapsed));
-    } else {
-      sync_log_debug(CURL_TYPE_UPLOAD, target_identifier, STR_FORMAT("Response: {} ({:.1f}s elapsed)", response.status_line, response.elapsed));
-    }
-  }
-}
 } // namespace http
 
 NLOHMANN_JSON_NAMESPACE_BEGIN
@@ -493,9 +534,9 @@ template <> struct adl_serializer<SyncConfig::Type> {
 };
 NLOHMANN_JSON_NAMESPACE_END
 
-std::mutex                                           sync_data_mtx;
-std::condition_variable                              sync_data_cv;
-std::queue<std::pair<SyncConfig::Type, std::string>> sync_data_queue;
+std::mutex                                                  sync_data_mtx;
+std::condition_variable                                     sync_data_cv;
+std::queue<std::tuple<SyncConfig::Type, std::string, bool>> sync_data_queue;
 
 std::mutex              combat_log_data_mtx;
 std::condition_variable combat_log_data_cv;
@@ -519,22 +560,22 @@ struct CachedAllianceData {
 std::unordered_map<int64_t, CachedAllianceData> alliance_data_cache;
 std::mutex                                      alliance_data_cache_mtx;
 
-void queue_data(SyncConfig::Type type, const std::string& data)
+void queue_data(SyncConfig::Type type, const std::string& data, bool is_first_sync = false)
 {
   {
     std::lock_guard lk(sync_data_mtx);
-    sync_data_queue.emplace(type, data);
+    sync_data_queue.emplace(type, data, is_first_sync);
     http::sync_log_debug("QUEUE", to_string(type), "Added data to sync queue");
   }
 
   sync_data_cv.notify_all();
 }
 
-void queue_data(SyncConfig::Type type, const nlohmann::json& data)
+void queue_data(SyncConfig::Type type, const nlohmann::json& data, bool is_first_sync = false)
 {
   {
     std::lock_guard lk(sync_data_mtx);
-    sync_data_queue.emplace(type, data.dump());
+    sync_data_queue.emplace(type, data.dump(), is_first_sync);
     http::sync_log_debug("QUEUE", to_string(type), STR_FORMAT("Added {} entries to sync queue", data.size()));
   }
 
@@ -746,11 +787,11 @@ void process_completed_missions(std::unique_ptr<std::string>&& bytes)
 
 void process_player_inventories(std::unique_ptr<std::string>&& bytes)
 {
-  using json = nlohmann::json;
-  static std::unordered_map<std::pair<std::underlying_type_t<Digit::PrimeServer::Models::InventoryItemType>, int64_t>,
-                            int64_t, pairhash>
-                    inventory_states;
-  static std::mutex inventory_states_mtx;
+  using json   = nlohmann::json;
+  using item_t = std::underlying_type_t<Digit::PrimeServer::Models::InventoryItemType>;
+  static std::unordered_map<std::pair<item_t, int64_t>, int64_t, pairhash> inventory_states;
+  static std::mutex                                                        inventory_states_mtx;
+  static std::atomic_bool                                                  is_first_sync{true};
 
   if (auto response = Digit::PrimeServer::Models::InventoryResponse(); response.ParseFromString(*bytes)) {
 
@@ -781,7 +822,8 @@ void process_player_inventories(std::unique_ptr<std::string>&& bytes)
     }
 
     if (!inventory_items.empty()) {
-      queue_data(SyncConfig::Type::Inventory, inventory_items);
+      const bool first_sync = is_first_sync.exchange(false, std::memory_order_acq_rel);
+      queue_data(SyncConfig::Type::Inventory, inventory_items, first_sync);
     }
   } else {
     spdlog::error("Failed to parse player inventories");
@@ -936,6 +978,8 @@ void process_global_active_buffs(std::unique_ptr<std::string>&& bytes)
   using json = nlohmann::json;
   static std::unordered_map<int64_t, std::pair<int32_t, int64_t>> buff_states;
   static std::mutex                                               buff_states_mtx;
+  static std::atomic_bool                                         is_first_sync{true};
+
 
   if (auto response = Digit::PrimeServer::Models::GlobalActiveBuffsResponse(); response.ParseFromString(*bytes)) {
 
@@ -979,7 +1023,8 @@ void process_global_active_buffs(std::unique_ptr<std::string>&& bytes)
     }
 
     if (!buff_array.empty()) {
-      queue_data(SyncConfig::Type::Buffs, buff_array);
+      const bool first_sync = is_first_sync.exchange(false, std::memory_order_acq_rel);
+      queue_data(SyncConfig::Type::Buffs, buff_array, first_sync);
     }
   } else {
     spdlog::error("Failed to parse global active buffs");
@@ -989,18 +1034,26 @@ void process_global_active_buffs(std::unique_ptr<std::string>&& bytes)
 static std::unordered_map<int64_t, int64_t> slot_states;
 static std::mutex                           slot_states_mtx;
 
-inline std::chrono::time_point<std::chrono::system_clock> parse_timestamp(const std::string& timestamp)
+inline std::optional<std::chrono::time_point<std::chrono::system_clock>> parse_timestamp(const std::string& timestamp)
 {
 #ifdef _WIN32
   std::istringstream ss(timestamp);
   std::chrono::system_clock::time_point time_point;
-  std::chrono::from_stream(ss, "%Y-%m-%dT%H:%M:%S", time_point);
+
+  if (!std::chrono::from_stream(ss, "%Y-%m-%dT%H:%M:%S", time_point)) {
+    spdlog::error("Failed to parse timestamp: {}", timestamp);
+    return std::nullopt;
+  }
+
   return time_point;
 #else
   std::tm tm = {};
-  strptime(timestamp.c_str(), "%Y-%m-%dT%H:%M:%S", &tm);
-  auto time_point = std::chrono::system_clock::from_time_t(std::mktime(&tm));
-  return time_point;
+  if (strptime(timestamp.c_str(), "%Y-%m-%dT%H:%M:%S", &tm) == nullptr) {
+    spdlog::error("Failed to parse timestamp: {}", timestamp);
+    return std::nullopt;
+  }
+
+  return std::chrono::system_clock::from_time_t(std::mktime(&tm));
 #endif
 }
 
@@ -1106,7 +1159,11 @@ void process_entity_slots_rtc(std::unique_ptr<std::string>&& json_payload)
           slot_params["expiry_time"] = nullptr;
         } else {
           const auto timestamp = parse_timestamp(data["consumable_slot_params"]["expiry_time"].get_ref<const std::string&>());
-          slot_params["expiry_time"] = timestamp.time_since_epoch().count();
+          if (timestamp.has_value()) {
+            slot_params["expiry_time"] = timestamp.value().time_since_epoch().count();
+          } else {
+            slot_params["expiry_time"] = nullptr;
+          }
         }
         break;
       case Digit::PrimeServer::Models::SLOTTYPE_OFFICERPRESET:
@@ -1126,7 +1183,11 @@ void process_entity_slots_rtc(std::unique_ptr<std::string>&& json_payload)
             slot_params["cooldown_expiration"] = nullptr;
           } else {
             const auto timestamp = parse_timestamp(params["cooldown_expiration"].get_ref<const std::string&>());
-            slot_params["cooldown_expiration"] = timestamp.time_since_epoch().count();
+            if (timestamp.has_value()) {
+              slot_params["cooldown_expiration"] = timestamp.value().time_since_epoch().count();
+            } else {
+              slot_params["cooldown_expiration"] = nullptr;
+            }
           }
         }
         break;
@@ -1173,6 +1234,7 @@ void process_jobs(std::unique_ptr<std::string>&& bytes)
   using json = nlohmann::json;
   static std::unordered_set<std::string> jobs_active;
   static std::mutex                      jobs_active_mtx;
+  static std::atomic_bool                is_first_sync{true};
 
   if (auto response = Digit::PrimeServer::Models::JobResponse(); response.ParseFromString(*bytes)) {
 
@@ -1247,7 +1309,8 @@ void process_jobs(std::unique_ptr<std::string>&& bytes)
     }
 
     if (!job_array.empty()) {
-      queue_data(SyncConfig::Type::Jobs, job_array);
+      bool first_sync = is_first_sync.exchange(false, std::memory_order_acq_rel);
+      queue_data(SyncConfig::Type::Jobs, job_array, first_sync);
     }
   } else {
     spdlog::error("Failed to parse jobs");
@@ -1303,7 +1366,6 @@ void process_battle_headers(const nlohmann::json& section)
       if (eastl::find(previously_sent_battlelogs.begin(), previously_sent_battlelogs.end(), id)
           == previously_sent_battlelogs.end()) {
         previously_sent_battlelogs.push_back(id);
-        ;
         to_enqueue.push_back(id);
       }
     }
@@ -1330,6 +1392,7 @@ void process_resources(const nlohmann::json& section)
   using json = nlohmann::json;
   static std::unordered_map<int64_t, int64_t> resource_states;
   static std::mutex                           resource_states_mtx;
+  static std::atomic_bool                     is_first_sync{true};
 
   http::sync_log_trace("PROCESS", "resources", STR_FORMAT("Processing {} resources", section.size()));
 
@@ -1349,7 +1412,8 @@ void process_resources(const nlohmann::json& section)
   }
 
   if (!resource_array.empty()) {
-    queue_data(SyncConfig::Type::Resources, resource_array);
+    bool first_sync = is_first_sync.exchange(false, std::memory_order_acq_rel);
+    queue_data(SyncConfig::Type::Resources, resource_array, first_sync);
   }
 }
 
@@ -1386,6 +1450,7 @@ void process_ships(const nlohmann::json& section)
   using json = nlohmann::json;
   static std::unordered_map<int64_t, ShipState> ship_states;
   static std::mutex                             ship_states_mtx;
+  static std::atomic_bool                       is_first_sync{true};
 
   http::sync_log_trace("PROCESS", "ships", STR_FORMAT("Processing {} ships", section.size()));
 
@@ -1406,6 +1471,7 @@ void process_ships(const nlohmann::json& section)
         ship_array.push_back({{"type", SyncConfig::Type::Ships},
                               {"psid", id},
                               {"level", level},
+                              {"level_percentage", level_percentage},
                               {"tier", tier},
                               {"hull_id", ship["hull_id"].get<int64_t>()},
                               {"components", components}});
@@ -1414,7 +1480,8 @@ void process_ships(const nlohmann::json& section)
   }
 
   if (!ship_array.empty()) {
-    queue_data(SyncConfig::Type::Ships, ship_array);
+    bool first_sync = is_first_sync.exchange(false, std::memory_order_acq_rel);
+    queue_data(SyncConfig::Type::Ships, ship_array, first_sync);
   }
 }
 
@@ -1505,38 +1572,44 @@ void cache_alliance_names(std::unique_ptr<std::string>&& bytes)
   }
 }
 
-void ship_sync_data()
+void ship_sync_data() noexcept
 {
 #if _WIN32
   WinRtApartmentGuard apartmentGuard;
 #endif
 
+  try {
+    for (;;) {
+      std::tuple<SyncConfig::Type, std::string, bool> sync_data;
+      {
+        std::unique_lock lock(sync_data_mtx);
+        sync_data_cv.wait(lock, []() { return !sync_data_queue.empty(); });
+        // Move the item out while holding the lock to avoid races/UB
+        sync_data = std::move(sync_data_queue.front());
+        sync_data_queue.pop();
+      }
 
-  for (;;) {
-    std::pair<SyncConfig::Type, std::string> sync_data;
-    {
-      std::unique_lock lock(sync_data_mtx);
-      sync_data_cv.wait(lock, []() { return !sync_data_queue.empty(); });
-      // Move the item out while holding the lock to avoid races/UB
-      sync_data = std::move(sync_data_queue.front());
-      sync_data_queue.pop();
-    }
-
-    try {
-      http::send_data(sync_data.first, sync_data.second);
-    } catch (const std::runtime_error& e) {
-      ErrorMsg::SyncRuntime("ship", e);
-    } catch (const std::exception& e) {
-      ErrorMsg::SyncMsg("ship", e.what());
-    } catch (const std::wstring& sz) {
-      ErrorMsg::SyncMsg("ship", sz);
+      try {
+        auto& [type, data, is_first_sync] = sync_data;
+        http::send_data(type, data, is_first_sync);
+      } catch (const std::runtime_error& e) {
+        ErrorMsg::SyncRuntime("ship", e);
+      } catch (const std::exception& e) {
+        ErrorMsg::SyncMsg("ship", e.what());
+      } catch (const std::wstring& sz) {
+        ErrorMsg::SyncMsg("ship", sz);
 #if _WIN32
-    } catch (winrt::hresult_error const& ex) {
-      ErrorMsg::SyncWinRT("ship", ex);
+      } catch (winrt::hresult_error const& ex) {
+        ErrorMsg::SyncWinRT("ship", ex);
 #endif
-    } catch (...) {
-      ErrorMsg::SyncMsg("ship", "Unknown error during sending of sync data");
+      } catch (...) {
+        ErrorMsg::SyncMsg("ship", "Unknown error during sending of sync data");
+      }
     }
+  } catch (const std::exception& e) {
+    spdlog::critical("ship_sync_data thread terminated: {}", e.what());
+  } catch (...) {
+    spdlog::critical("ship_sync_data thread terminated: unknown exception");
   }
 }
 
@@ -1615,7 +1688,7 @@ void resolve_alliance_names(const std::unordered_set<int64_t>& alliance_ids, nlo
   }
 }
 
-void ship_combat_log_data()
+void ship_combat_log_data() noexcept
 {
   using json = nlohmann::json;
 
@@ -1740,7 +1813,7 @@ void ship_combat_log_data()
 
       try {
         auto ship_data = battle_array.dump();
-        http::send_data(SyncConfig::Type::Battles, ship_data);
+        http::send_data(SyncConfig::Type::Battles, ship_data, false);
       } catch (const std::runtime_error& e) {
         ErrorMsg::SyncRuntime("combat", e);
       } catch (const std::exception& e) {
@@ -1779,15 +1852,21 @@ void HandleEntityGroup(EntityGroup* entity_group)
   auto submit_async = [bytesPtr, byteCount]<typename T>(T&& func) {
     auto payload = std::make_unique<std::string>(bytesPtr, byteCount);
 
-    std::thread([f = std::forward<T>(func), p = std::move(payload)]() mutable {
-      try {
-        f(std::move(p));
-      } catch (const std::exception& e) {
-        spdlog::error("Exception in HandleEntityGroup: {}", e.what());
-      } catch (...) {
-        spdlog::error("Unknown exception in HandleEntityGroup");
-      }
-    }).detach();
+    try {
+      std::thread([f = std::forward<T>(func), p = std::move(payload)]() mutable {
+        try {
+          f(std::move(p));
+        } catch (const std::exception& e) {
+          spdlog::error("Exception in HandleEntityGroup: {}", e.what());
+        } catch (...) {
+          spdlog::error("Unknown exception in HandleEntityGroup");
+        }
+      }).detach();
+    } catch (const std::exception& e) {
+      spdlog::error("Failed to spawn async task: {}", e.what());
+    } catch (...) {
+      spdlog::error("Failed to spawn async task: unknown exception");
+    }
   };
 
   switch (entity_group->Type_) {
@@ -1850,10 +1929,12 @@ void HandleEntityGroup(EntityGroup* entity_group)
       if (Config::Get().sync_options.buffs) {
         submit_async(process_alliance_games_props);
       }
+      break;
     case EntityGroup::Type::UserProfiles:
       if (Config::Get().sync_options.battlelogs) {
         submit_async(cache_player_names);
       }
+      break;
     case EntityGroup::Type::AllianceProfiles:
       if (Config::Get().sync_options.battlelogs) {
         submit_async(cache_alliance_names);
@@ -1927,17 +2008,17 @@ void GameServerModelRegistry_HandleBinaryObjects(auto original, void* _this, Ser
 }
 
 void PrimeApp_InitPrimeServer(auto original, void* _this, Il2CppString* gameServerUrl, Il2CppString* gatewayServerUrl,
-                              Il2CppString* sessionId)
+                              Il2CppString* sessionId, Il2CppString* serverRegion)
 {
-  original(_this, gameServerUrl, gatewayServerUrl, sessionId);
+  original(_this, gameServerUrl, gatewayServerUrl, sessionId, serverRegion);
   http::headers::instanceSessionId = to_string(to_wstring(sessionId));
   http::headers::gameServerUrl     = to_string(to_wstring(gameServerUrl));
 }
 
 void GameServer_Initialise(auto original, void* _this, Il2CppString* sessionId, Il2CppString* gameVersion,
-                           bool encryptRequests)
+                           bool encryptRequests, Il2CppString* serverRegion)
 {
-  original(_this, sessionId, gameVersion, encryptRequests);
+  original(_this, sessionId, gameVersion, encryptRequests, serverRegion);
   http::headers::primeVersion = to_string(to_wstring(gameVersion));
 }
 
@@ -2103,11 +2184,11 @@ void InstallSyncPatches()
     }
   }
 
-  if (auto authentication_service = il2cpp_get_class_helper("Assembly-CSharp", "Digit.Client.Core", "PrimeApp");
-      !authentication_service.isValidHelper()) {
+  if (auto prime_app = il2cpp_get_class_helper("Assembly-CSharp", "Digit.Client.Core", "PrimeApp");
+      !prime_app.isValidHelper()) {
     ErrorMsg::MissingHelper("Core", "PrimeApp");
   } else {
-    if (const auto ptr = authentication_service.GetMethod("InitPrimeServer"); ptr == nullptr) {
+    if (const auto ptr = prime_app.GetMethod("InitPrimeServer"); ptr == nullptr) {
       ErrorMsg::MissingMethod("PrimeApp", "InitPrimeServer");
     } else {
       SPUD_STATIC_DETOUR(ptr, PrimeApp_InitPrimeServer);
@@ -2134,5 +2215,4 @@ void InstallSyncPatches()
 
   std::thread(ship_sync_data).detach();
   std::thread(ship_combat_log_data).detach();
-  std::thread(http::handle_response_data).detach();
 }

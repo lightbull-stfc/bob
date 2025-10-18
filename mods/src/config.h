@@ -39,6 +39,7 @@ public:
   };
 
   std::string proxy;
+  bool verify_ssl = true;
 
   bool battlelogs = false;
   bool buffs      = false;
