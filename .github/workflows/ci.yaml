@@ -41,7 +41,7 @@ jobs:
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: stfc-community-patch
+          name: stfc-community-mod
           path: version.dll
 
   build-mac:
@@ -80,23 +80,23 @@ jobs:
           lipo -create build/macosx/arm64/release/libstfc-community-patch.dylib build/macosx/x86_64/release/libstfc-community-patch.dylib -output build/macosx/arm64/release/macOSLauncher.app/Contents/libstfc-community-patch.dylib
           cp assets/launcher.icns build/macosx/arm64/release/macOSLauncher.app/Contents/Resources/
           cp macos-launcher/src/Info.plist build/macosx/arm64/release/macOSLauncher.app/Contents/
-          mv build/macosx/arm64/release/macOSLauncher.app build/macosx/arm64/release/STFC\ Community\ Patch.app
+          mv build/macosx/arm64/release/macOSLauncher.app build/macosx/arm64/release/STFC\ Community\ Mod.app
 
       - name: Sign Universal App Bundle
         continue-on-error: true
-        run: codesign --force --verify --verbose --deep --sign "-" build/macosx/arm64/release/STFC\ Community\ Patch.app
+        run: codesign --force --verify --verbose --deep --sign "-" build/macosx/arm64/release/STFC\ Community\ Mod.app
 
       - name: Set up Homebrew
         uses: Homebrew/actions/setup-homebrew@main
 
-      - name: Install brew things
+      - name: Install disk image creation tool
         run: brew install create-dmg
 
       - name: Create installer
-        run: create-dmg --filesystem APFS --format ULFO --volname "STFC Community Patch Installer" --volicon assets/launcher.icns --background assets/mac_installer_background.png --window-pos 200 120 --window-size 800 400 --icon-size 100 --icon "STFC Community Patch.app" 200 190 --app-drop-link 600 185 stfc-community-patch-installer.dmg build/macosx/arm64/release/
+        run: create-dmg --filesystem APFS --format ULFO --volname "STFC Community Mod Installer" --volicon assets/launcher.icns --background assets/mac_installer_background.png --window-pos 200 120 --window-size 800 400 --icon-size 100 --icon "STFC Community Mod.app" 200 190 --app-drop-link 600 185 stfc-community-mod-installer.dmg build/macosx/arm64/release/
 
       - name: Upload
         uses: actions/upload-artifact@v4
         with:
-          name: stfc-community-patch-installer
-          path: stfc-community-patch-installer.dmg
+          name: stfc-community-mod-installer
+          path: stfc-community-mod-installer.dmg
