@@ -43,6 +43,7 @@ jobs:
         with:
           name: stfc-community-mod
           path: version.dll
+          if-no-files-found: error
 
   build-mac:
     runs-on: macos-15
@@ -73,7 +74,7 @@ jobs:
       - name: Build (x84)
         run: xmake -y
 
-      - name: Create Universal App Bundle
+      - name: Create App Bundle
         run: |
           lipo -create build/macosx/arm64/release/macOSLauncher build/macosx/x86_64/release/macOSLauncher -output build/macosx/arm64/release/macOSLauncher.app/Contents/MacOS/macOSLauncher
           lipo -create build/macosx/arm64/release/stfc-community-patch-loader build/macosx/x86_64/release/stfc-community-patch-loader -output build/macosx/arm64/release/macOSLauncher.app/Contents/stfc-community-patch-loader
@@ -82,8 +83,7 @@ jobs:
           cp macos-launcher/src/Info.plist build/macosx/arm64/release/macOSLauncher.app/Contents/
           mv build/macosx/arm64/release/macOSLauncher.app build/macosx/arm64/release/STFC\ Community\ Mod.app
 
-      - name: Sign Universal App Bundle
-        continue-on-error: true
+      - name: Sign App Bundle
         run: codesign --force --verify --verbose --deep --sign "-" build/macosx/arm64/release/STFC\ Community\ Mod.app
 
       - name: Set up Homebrew
@@ -100,3 +100,5 @@ jobs:
         with:
           name: stfc-community-mod-installer
           path: stfc-community-mod-installer.dmg
+          compression-level: 0
+          if-no-files-found: error
