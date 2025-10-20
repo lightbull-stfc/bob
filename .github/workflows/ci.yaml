@@ -20,30 +20,14 @@ jobs:
         with:
           submodules: "recursive"
 
-      - name: Ensure package cache folder exists
-        run: mkdir -p ~/.xmake/packages
-
-      - name: Ensure build cache folder exists
-        run: mkdir -p build/.xmake
-
-      - name: Cache xmake packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.xmake/packages
-          key: ${{ runner.os }}-xmake-packages-${{ hashFiles('xmake.lua') }}
-
-      - name: Cache xmake build
-        uses: actions/cache@v4
-        with:
-          path: build/.xmake
-          key: ${{ runner.os }}-xmake-build-${{ hashFiles('xmake.lua') }}
-
       - name: Setup
         uses: xmake-io/github-action-setup-xmake@v1
         with:
           xmake-version: latest
           package-cache: true
-          package-cache-key: 'stfc-mod-ci-win'
+          package-cache-key: ${{ runner.os }}-xmake-packages-${{ hashFiles('**/xmake.lua') }}
+          build-cache: true
+          build-cache-key: ${{ runner.os }}-xmake-build-${{ hashFiles('**/xmake.lua') }}
 
       - name: Configure
         run: xmake f -m release -y
@@ -68,30 +52,14 @@ jobs:
         with:
           submodules: "recursive"
 
-      - name: Ensure package cache folder exists
-        run: mkdir -p ~/.xmake/packages
-
-      - name: Ensure build cache folder exists
-        run: mkdir -p build/.xmake
-
-      - name: Cache xmake packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.xmake/packages
-          key: ${{ runner.os }}-xmake-packages-${{ hashFiles('xmake.lua') }}
-
-      - name: Cache xmake build
-        uses: actions/cache@v4
-        with:
-          path: build/.xmake
-          key: ${{ runner.os }}-xmake-build-${{ hashFiles('xmake.lua') }}
-
-      - name: Set up xmake
+      - name: Setup
         uses: xmake-io/github-action-setup-xmake@v1
         with:
           xmake-version: latest
           package-cache: true
-          package-cache-key: 'stfc-mod-ci-mac'
+          package-cache-key: ${{ runner.os }}-xmake-packages-${{ hashFiles('**/xmake.lua') }}
+          build-cache: true
+          build-cache-key: ${{ runner.os }}-xmake-build-${{ hashFiles('**/xmake.lua') }}
 
       - name: Configure (arm64)
         run: xmake f -p macosx -a "arm64" -m release -y
