@@ -78,7 +78,8 @@ jobs:
           lipo -create build/macosx/arm64/release/macOSLauncher build/macosx/x86_64/release/macOSLauncher -output build/macosx/arm64/release/macOSLauncher.app/Contents/MacOS/macOSLauncher
           lipo -create build/macosx/arm64/release/stfc-community-patch-loader build/macosx/x86_64/release/stfc-community-patch-loader -output build/macosx/arm64/release/macOSLauncher.app/Contents/stfc-community-patch-loader
           lipo -create build/macosx/arm64/release/libstfc-community-patch.dylib build/macosx/x86_64/release/libstfc-community-patch.dylib -output build/macosx/arm64/release/macOSLauncher.app/Contents/libstfc-community-patch.dylib
-          cp assets/launcher.icns build/macosx/arm64/release/macOSLauncher.app/Contents/Resources
+          cp assets/launcher.icns build/macosx/arm64/release/macOSLauncher.app/Contents/Resources/
+          cp macos-launcher/src/Info.plist build/macosx/arm64/release/macOSLauncher.app/Contents/
           mv build/macosx/arm64/release/macOSLauncher.app build/macosx/arm64/release/STFC\ Community\ Patch.app
 
       - name: Sign Universal App Bundle
