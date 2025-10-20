@@ -25,9 +25,9 @@ jobs:
         with:
           xmake-version: latest
           package-cache: true
-          package-cache-key: ${{ runner.os }}-xmake-packages-${{ hashFiles('**/xmake.lua') }}
+          package-cache-key: ${{ runner.os }}-xmake-packages-${{ hashFiles('**/xmake.lua', '!macos-*/xmake.lua') }}
           build-cache: true
-          build-cache-key: ${{ runner.os }}-xmake-build-${{ hashFiles('**/xmake.lua') }}
+          build-cache-key: ${{ runner.os }}-xmake-build-${{ hashFiles('**/xmake.lua', '!macos-*/xmake.lua') }}
 
       - name: Configure
         run: xmake f -m release -y
@@ -57,9 +57,9 @@ jobs:
         with:
           xmake-version: latest
           package-cache: true
-          package-cache-key: ${{ runner.os }}-xmake-packages-${{ hashFiles('**/xmake.lua') }}
+          package-cache-key: ${{ runner.os }}-xmake-packages-${{ hashFiles('**/xmake.lua', '!win-*/xmake.lua') }}
           build-cache: true
-          build-cache-key: ${{ runner.os }}-xmake-build-${{ hashFiles('**/xmake.lua') }}
+          build-cache-key: ${{ runner.os }}-xmake-build-${{ hashFiles('**/xmake.lua', '!win-*/xmake.lua') }}
 
       - name: Configure (arm64)
         run: xmake f -p macosx -a "arm64" -m release -y
