@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   build-win:
-    runs-on: windows-latest
+    runs-on: windows-2025
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -46,7 +46,7 @@ jobs:
           if-no-files-found: error
 
   build-mac:
-    runs-on: macos-15
+    runs-on: macos-26
     steps:
       - name: Checkout
         uses: actions/checkout@v5
@@ -85,9 +85,6 @@ jobs:
 
       - name: Sign App Bundle
         run: codesign --force --verify --verbose --deep --sign "-" build/macosx/arm64/release/STFC\ Community\ Mod.app
-
-      - name: Set up Homebrew
-        uses: Homebrew/actions/setup-homebrew@main
 
       - name: Install disk image creation tool
         run: brew install create-dmg
