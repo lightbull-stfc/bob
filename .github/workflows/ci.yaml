@@ -71,7 +71,7 @@ jobs:
       - name: Configure (x86)
         run: xmake f -p macosx -a "x86_64" -m release -y
 
-      - name: Build (x84)
+      - name: Build (x86)
         run: xmake -y
 
       - name: Create App Bundle
