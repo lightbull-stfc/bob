@@ -28,6 +28,7 @@ jobs:
           package-cache-key: ${{ hashFiles('**/xmake.lua', '!macos-*/xmake.lua') }}
           build-cache: true
           build-cache-key: ${{ hashFiles('**/xmake.lua', '!macos-*/xmake.lua') }}
+          build-cache-path: 'build/.build_cache'
 
       - name: Configure
         run: xmake f -m release -y
@@ -61,6 +62,7 @@ jobs:
           package-cache-key: ${{ hashFiles('**/xmake.lua', '!win-*/xmake.lua') }}
           build-cache: true
           build-cache-key: ${{ hashFiles('**/xmake.lua', '!win-*/xmake.lua') }}
+          build-cache-path: 'build/.build_cache'
 
       - name: Configure (arm64)
         run: xmake f -p macosx -a "arm64" -m release -y
