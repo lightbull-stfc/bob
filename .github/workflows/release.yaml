@@ -44,7 +44,7 @@ jobs:
 
       - name: Package
         run: |
-          (cd stfc-community-patch && zip -r - .) > stfc-community-patch.zip
+          (cd stfc-community-mod && zip -r - .) > stfc-community-mod.zip
 
       - name: Upload Community Patch - Standard
         uses: shogo82148/actions-upload-release-asset@v1
@@ -52,8 +52,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./stfc-community-patch.zip
-          asset_name: stfc-community-patch.zip
+          asset_path: ./stfc-community-mod.zip
+          asset_name: stfc-community-mod.zip
           asset_content_type: application/zip
 
       - name: Upload Community Patch - Versioned
@@ -62,8 +62,8 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./stfc-community-patch.zip
-          asset_name: stfc-community-patch-${{ github.ref_name }}.zip
+          asset_path: ./stfc-community-mod.zip
+          asset_name: stfc-community-mod-${{ github.ref_name }}.zip
           asset_content_type: application/zip
 
       - name: Upload Community Patch - Mac Installer
@@ -72,5 +72,5 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./stfc-community-patch-installer/stfc-community-patch-installer.dmg
-          asset_name: stfc-community-patch-installer.dmg
+          asset_path: ./stfc-community-mod-installer/stfc-community-mod-installer.dmg
+          asset_name: stfc-community-mod-installer.dmg
