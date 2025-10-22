@@ -134,6 +134,7 @@ public:
       if (m_handle) {
         curl_url_cleanup(m_handle);
       }
+
       m_handle = other.m_handle;
       m_url = std::move(other.m_url);
       other.m_handle = nullptr;
@@ -159,7 +160,7 @@ public:
     }
   }
   
-  const char* c_str() const
+  [[nodiscard]] const char* c_str() const
   {
     return m_url.c_str();
   }
@@ -217,7 +218,7 @@ struct TargetWorker {
 
   std::shared_ptr<cpr::Session> session;
   std::thread                   worker_thread;
-  std::atomic<bool>             stop_requested{false};
+  std::atomic_bool              stop_requested{false};
   std::queue<request_t>         request_queue;
   std::mutex                    queue_mtx;
   std::condition_variable       queue_cv;
@@ -352,22 +353,23 @@ static std::shared_ptr<TargetWorker> get_curl_client_sync(const std::string& tar
 
 static void send_data(SyncConfig::Type type, const std::string& post_data, bool is_first_sync)
 {
-  static std::once_flag init_once;
-  std::call_once(init_once, []() {
-    const auto& targets = Config::Get().sync_targets;
+  static std::once_flag emit_warning;
+  const auto& targets = Config::Get().sync_targets;
+
+  std::call_once(emit_warning, [targets] {
     if (targets.empty()) {
       sync_log_warn(CURL_TYPE_UPLOAD, "GLOBAL", "No target found, will not attempt to send");
     }
   });
 
-  for (const auto& target : Config::Get().sync_targets
+  for (const auto& target : targets
        | std::views::filter([type](const auto& t) { return t.second.enabled(type); })
        | std::views::keys) {
 
     const auto target_identifier = STR_FORMAT("{} ({})", target, to_string(type));
 
     try {
-      auto worker = get_curl_client_sync(target);
+      const auto worker = get_curl_client_sync(target);
 
       // Enqueue the request for this target's worker
       {
@@ -376,7 +378,7 @@ static void send_data(SyncConfig::Type type, const std::string& post_data, bool 
         sync_log_trace(CURL_TYPE_UPLOAD, target_identifier,
                        STR_FORMAT("Queued request (queue size: {})", worker->request_queue.size()));
       }
-      worker->queue_cv.notify_one();
+      worker->queue_cv.notify_all();
 
     } catch (const std::runtime_error& e) {
       spdlog::error("Failed to send sync data to target '{}' - Runtime error: {}", target_identifier, e.what());
@@ -428,12 +430,15 @@ static std::shared_ptr<cpr::Session> get_curl_client_scopely()
 
 static std::string get_scopely_data(const std::string& path, const std::string& post_data)
 {
-  static std::once_flag init_once;
-  std::call_once(init_once, []() {
-    if (Config::Get().sync_targets.empty()) {
+  static std::once_flag emit_warning;
+
+  if (Config::Get().sync_targets.empty()) {
+    std::call_once(emit_warning, [] {
       sync_log_warn(CURL_TYPE_UPLOAD, "GLOBAL", "No target found, will not attempt to retrieve data");
-    }
-  });
+    });
+
+    return {};
+  }
 
   Url url(headers::gameServerUrl);
   url.set_path(path);
@@ -1572,7 +1577,7 @@ void cache_alliance_names(std::unique_ptr<std::string>&& bytes)
   }
 }
 
-void ship_sync_data() noexcept
+void ship_sync_data()
 {
 #if _WIN32
   WinRtApartmentGuard apartmentGuard;
@@ -1688,7 +1693,7 @@ void resolve_alliance_names(const std::unordered_set<int64_t>& alliance_ids, nlo
   }
 }
 
-void ship_combat_log_data() noexcept
+void ship_combat_log_data()
 {
   using json = nlohmann::json;
 
@@ -1713,6 +1718,10 @@ void ship_combat_log_data() noexcept
       const json journals_body{{"journal_id", journal_id}};
       auto       battle_log = http::get_scopely_data("/journals/get", journals_body.dump());
       json       battle_json;
+
+      if (battle_log.empty()) {
+        continue;
+      }
 
       try {
         battle_json = std::move(json::parse(battle_log));
