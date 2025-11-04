@@ -8,10 +8,11 @@
 
 #include <spud/detour.h>
 
-static bool BuffService_IsBuffConditionMet(auto original, int64_t _unused, BuffCondition condition,
-                                           IBuffComparer *comparer, IBuffData *buffToCompare, bool excludeFactionBuffs)
+static bool BuffService_IsBuffConditionMet(auto original, void* _this, BuffCondition currentCondition,
+                                           IBuffComparer *buffComparer, IBuffData *buffToCompare,
+                                           bool excludeFactionBuffs, bool isAllianceLoyalty)
 {
-  switch (condition) {
+  switch (currentCondition) {
     case BuffCondition::CondSelfAtStation: {
       if (Config::Get().use_out_of_dock_power) {
         return false;
@@ -22,7 +23,7 @@ static bool BuffService_IsBuffConditionMet(auto original, int64_t _unused, BuffC
       break;
   }
 
-  return original(_unused, condition, comparer, buffToCompare, excludeFactionBuffs);
+  return original(_this, currentCondition, buffComparer, buffToCompare, excludeFactionBuffs, isAllianceLoyalty);
 }
 
 void InstallBuffFixHooks()
@@ -33,7 +34,7 @@ void InstallBuffFixHooks()
     ErrorMsg::MissingHelper("Services", "BuffService");
   } else {
     if (const auto ptr = buffHelper.GetMethod("IsBuffConditionMet"); ptr == nullptr) {
-      ErrorMsg::MissingMethod("BuffServices", "IsBuffConditionMet");
+      ErrorMsg::MissingMethod("BuffService", "IsBuffConditionMet");
     } else {
       SPUD_STATIC_DETOUR(ptr, BuffService_IsBuffConditionMet);
     }
