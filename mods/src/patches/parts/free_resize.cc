@@ -81,7 +81,7 @@ LONG                      SetWindowLongW_Hook(_In_ HWND hWnd, _In_ int nIndex, _
       }
 
       if (!WndProcInstalled) {
-        if (Config::Get().borderless_fullscreen_f11) {
+        if (Config::Get().borderless_fullscreen) {
           oWndProc         = SetWindowLongPtr(hWnd, GWLP_WNDPROC, (LONG_PTR)WndProc);
           WndProcInstalled = true;
         }

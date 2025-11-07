@@ -308,18 +308,30 @@ void ScreenManager_Update_Hook(auto original, ScreenManager* _this)
         config->show_hostile_cargo = !config->show_hostile_cargo;
       } else if (MapKey::IsDown(GameFunction::ToggleCargoArmada)) {
         config->show_armada_cargo = !config->show_armada_cargo;
+      } else if (MapKey::IsDown(GameFunction::LogLevelOff)) {
+        // spdlog::log("Setting log level to OFF");
+        spdlog::set_level(spdlog::level::off);
+        spdlog::flush_on(spdlog::level::off);
+      } else if (MapKey::IsDown(GameFunction::LogLevelError)) {
+        spdlog::set_level(spdlog::level::err);
+        spdlog::flush_on(spdlog::level::err);
+        // spdlog::log("Setting log level to ERROR");
+      } else if (MapKey::IsDown(GameFunction::LogLevelWarn)) {
+        spdlog::set_level(spdlog::level::warn);
+        spdlog::flush_on(spdlog::level::warn);
+        // spdlog::log("Setting log level to WARN");
       } else if (MapKey::IsDown(GameFunction::LogLevelInfo)) {
         spdlog::set_level(spdlog::level::info);
         spdlog::flush_on(spdlog::level::info);
-        spdlog::warn("Setting log level to INFO");
+        // spdlog::log("Setting log level to INFO");
       } else if (MapKey::IsDown(GameFunction::LogLevelDebug)) {
         spdlog::set_level(spdlog::level::debug);
         spdlog::flush_on(spdlog::level::debug);
-        spdlog::warn("Setting log level to DEBUG");
+        // spdlog::log("Setting log level to DEBUG");
       } else if (MapKey::IsDown(GameFunction::LogLevelTrace)) {
         spdlog::set_level(spdlog::level::trace);
         spdlog::flush_on(spdlog::level::trace);
-        spdlog::warn("Setting log level to TRACE");
+        // spdlog::log("Setting log level to TRACE");
       } else if (MapKey::IsDown(GameFunction::ShowShips)) {
         auto fleet_bar        = ObjectFinder<FleetBarViewController>::Get();
         auto fleet_controller = fleet_bar->_fleetPanelController;

@@ -86,6 +86,9 @@ enum GameFunction {
   LogLevelDebug,
   LogLevelInfo,
   LogLevelTrace,
+  LogLevelError,
+  LogLevelWarn,
+  LogLevelOff,
   Quit,
 
   // Automatic max value
