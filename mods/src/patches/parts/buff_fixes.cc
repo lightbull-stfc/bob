@@ -13,11 +13,8 @@ static bool BuffService_IsBuffConditionMet(auto original, void* _this, BuffCondi
                                            bool excludeFactionBuffs, bool isAllianceLoyalty)
 {
   switch (currentCondition) {
-    case BuffCondition::CondSelfAtStation: {
-      if (Config::Get().use_out_of_dock_power) {
-        return false;
-      }
-    }
+    case BuffCondition::CondSelfAtStation:
+      return false;
 
     default:
       break;
@@ -28,15 +25,17 @@ static bool BuffService_IsBuffConditionMet(auto original, void* _this, BuffCondi
 
 void InstallBuffFixHooks()
 {
-  auto buffHelper =
-      il2cpp_get_class_helper("Digit.Client.PrimeLib.Runtime", "Digit.PrimeServer.Services", "BuffService");
-  if (!buffHelper.isValidHelper()) {
-    ErrorMsg::MissingHelper("Services", "BuffService");
-  } else {
-    if (const auto ptr = buffHelper.GetMethod("IsBuffConditionMet"); ptr == nullptr) {
-      ErrorMsg::MissingMethod("BuffService", "IsBuffConditionMet");
+  if (Config::Get().use_out_of_dock_power) {
+    auto buffHelper =
+        il2cpp_get_class_helper("Digit.Client.PrimeLib.Runtime", "Digit.PrimeServer.Services", "BuffService");
+    if (!buffHelper.isValidHelper()) {
+      ErrorMsg::MissingHelper("Services", "BuffService");
     } else {
-      SPUD_STATIC_DETOUR(ptr, BuffService_IsBuffConditionMet);
+      if (const auto ptr = buffHelper.GetMethod("IsBuffConditionMet"); ptr == nullptr) {
+        ErrorMsg::MissingMethod("BuffService", "IsBuffConditionMet");
+      } else {
+        SPUD_STATIC_DETOUR(ptr, BuffService_IsBuffConditionMet);
+      }
     }
   }
 }
