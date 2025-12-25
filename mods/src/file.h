@@ -25,7 +25,8 @@
 // Original output file names
 #define FILE_DEF_CONFIG "community_patch_settings.toml"
 #define FILE_DEF_LOG "community_patch.log"
-#define FILE_DEF_VARS "community_path_runtime.vars"
+#define FILE_DEF_VARS "community_patch_runtime.vars"
+#define FILE_DEF_VARS_OLD "community_path_runtime.vars"
 #define FILE_DEF_BL "patch_battlelogs_sent.json"
 #define FILE_DEF_PARSED "community_patch_settings_parsed.toml"
 #define FILE_DEF_TITLE L"Star Trek Fleet Command"
@@ -46,15 +47,29 @@ public:
   static const char*  Log();
   static const char*  Battles();
   static bool         hasCustomNames();
+  static bool         hasDebug();
+  static bool         hasTrace();
 
 #if _WIN32
-  static std::string_view MakePath(std::string_view filename, bool create_dir = false);
+  static std::string_view MakePath(std::string_view filename, bool create_dir = false, bool old_path = false);
 #else
-  static std::u8string MakePath(std::string_view filename, bool create_dir = false);
+  static std::u8string MakePath(std::string_view filename, bool create_dir = false, bool old_path = false);
 #endif
 
 private:
   static std::filesystem::path Path();
 
+  static bool debug;
+  static bool trace;
   static bool override;
+  static bool initialized;
+
+  static std::wstring cacheNameTitle;
+  static std::string  cacheNameBattles;
+  static std::string  cacheNameLog;
+  static std::string  cacheNameVar;
+  static std::string  cacheNameConfig;
+  static std::string  cacheNameDefault;
+
+  static std::filesystem::path configPath;
 };

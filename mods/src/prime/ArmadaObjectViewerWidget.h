@@ -3,6 +3,7 @@
 #include "errormsg.h"
 #include <il2cpp/il2cpp_helper.h>
 
+#include "FleetPlayerData.h"
 #include "GenericButtonContext.h"
 #include "ObjectViewerBaseWidget.h"
 #include "Widget.h"
@@ -50,10 +51,13 @@ public:
     }
   }
 
-  bool HasJoinButton()
+  bool IsAllowedToJoinArmada(FleetPlayerData* fleet)
   {
-    // TODO
-    return false;
+    static auto method =
+        get_class_helper().GetMethod<bool(ArmadaObjectViewerWidget*, FleetPlayerData*)>("IsAllowedToJoinArmada");
+    bool result = method(this, fleet);
+    spdlog::info("IsAllowedToJoinArmada: {}", result);
+    return result;
   }
 
 private:

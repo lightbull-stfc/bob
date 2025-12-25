@@ -8,7 +8,6 @@
 
 struct GenericButtonWidget : public Widget<GenericButtonContext, GenericButtonWidget> {
 public:
-  __declspec(property(get = __get_isActiveAndEnabled)) bool                          isActiveAndEnabled;
   __declspec(property(get = __get_SemaphoreButtonListener)) SemaphoreButtonListener* SemaphoreListener;
 
   static IL2CppClassHelper& get_class_helper()
@@ -26,11 +25,5 @@ public:
   {
     static auto field = get_class_helper().GetField("_semaphoreButtonListener").offset();
     return *(SemaphoreButtonListener**)((char*)this + field);
-  }
-
-  bool __get_isActiveAndEnabled()
-  {
-    static auto field = get_class_helper().GetProperty("isActiveAndEnabled");
-    return *field.Get<bool>(this);
   }
 };

@@ -6,6 +6,7 @@ template <typename T, typename Y> struct Widget {
 public:
   __declspec(property(get = __get_Context)) T* Context;
   __declspec(property(get = __get_enabled)) bool enabled;
+  __declspec(property(get = __get_isActiveAndEnabled)) bool isActiveAndEnabled;
 
   bool IsActive()
   {
@@ -31,5 +32,11 @@ public:
   {
     static auto field = get_class_helper().GetProperty("Context");
     return field.GetRaw<T>(this);
+  }
+
+  bool __get_isActiveAndEnabled()
+  {
+    static auto field = get_class_helper().GetProperty("isActiveAndEnabled");
+    return *field.Get<bool>(this);
   }
 };

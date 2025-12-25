@@ -14,7 +14,8 @@ enum class VisibilityState // TypeDefIndex: 13743
 struct VisibilityController {
 public:
   __declspec(property(get = __get__state)) VisibilityState _state;
-
+  __declspec(property(get = __get_State)) VisibilityState State;
+  
   void Show(bool instant = false)
   {
     auto Show = get_class_helper().GetMethodSpecial<void(VisibilityController*, bool)>(
@@ -51,5 +52,11 @@ public:
   {
     static auto field = get_class_helper().GetField("_state");
     return *(VisibilityState*)((ptrdiff_t)this + field.offset());
+  }
+
+  VisibilityState __get_State()
+  {
+    static auto prop = get_class_helper().GetProperty("VisibilityState");
+    return *prop.Get<VisibilityState>(this);
   }
 };

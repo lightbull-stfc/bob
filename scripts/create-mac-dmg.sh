@@ -6,10 +6,12 @@ CONFIG=${1:-release}
 ARCH=arm64
 
 xmake clean
-# xmake m package --plat=macosx --arch="arm64,x86_64" -f "--mode=$CONFIG --yes"
-xmake f -y -p macosx -a "arm64" -m $CONFIG
+# Build the arm64 version
+xmake f -y -p macosx -a "arm64" -m $CONFIG --target_minver=13.5
 xmake
-xmake f -y -p macosx -a "x86_64" -m $CONFIG
+
+# Build the x86_64 version
+xmake f -y -p macosx -a "x86_64" -m $CONFIG --target_minver=13.5
 xmake
 
 rm build/macosx/$ARCH/$CONFIG/libmods.a || true
