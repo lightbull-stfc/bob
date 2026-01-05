@@ -2,7 +2,9 @@
 
 ## IMPORTANT NOTE:
 
-The current full release 0.6.0 no longer works with the latest STFC clients.  Please use the 0.6.1.8 (Alpha) or later
+We have finally released v1.0.0 of the mod, which replaces the previous 0.6.0 version (previously known as Rippers mod).  All previous full releases
+will fail to work wtih the latest STFC game client.  If you have issues, please check with our discord team and ensure that you have the latest 
+release installed.
 
 ## BACK TO THE REGULAR STUFF:
 <p align="center">
