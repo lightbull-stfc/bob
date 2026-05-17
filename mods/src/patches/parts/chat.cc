@@ -8,7 +8,7 @@
 #include <spud/detour.h>
 #include <tuple>
 
-auto GetChatTabIndices()
+static auto GetChatTabIndices()
 {
   if (const auto chat_manager = ChatManager::Instance(); chat_manager) {
     const auto hasCadetChat    = chat_manager->CanSeeNewbieChat();
@@ -24,7 +24,7 @@ auto GetChatTabIndices()
   return std::make_tuple(-1, 0, -1, 1);
 }
 
-void DisableButtons(FullScreenChatViewController* _this)
+static void DisableButtons(FullScreenChatViewController* _this)
 {
   const auto disableGalaxyChat = Config::Get().disable_galaxy_chat;
   const auto disableVeilChat = Config::Get().disable_veil_chat;
@@ -68,13 +68,13 @@ void DisableButtons(FullScreenChatViewController* _this)
   }
 }
 
-void FullScreenChatViewController_AboutToShow(auto original, FullScreenChatViewController* _this)
+static void FullScreenChatViewController_AboutToShow(auto original, FullScreenChatViewController* _this)
 {
   original(_this);
   DisableButtons(_this);
 }
 
-void FullScreenChatViewController_OnDidChangeSelectedTab(auto original, FullScreenChatViewController* _this, int32_t tabIdx, void* tab)
+static void FullScreenChatViewController_OnDidChangeSelectedTab(auto original, FullScreenChatViewController* _this, int32_t tabIdx, void* tab)
 {
   const auto [cadetChatIdx, galaxyChatIdx, veilChatIdx, allianceChatIdx] = GetChatTabIndices();
   if ((tabIdx == galaxyChatIdx && Config::Get().disable_galaxy_chat) || (tabIdx == veilChatIdx && Config::Get().disable_veil_chat)) {
@@ -85,7 +85,7 @@ void FullScreenChatViewController_OnDidChangeSelectedTab(auto original, FullScre
   original(_this, tabIdx, tab);
 }
 
-void ChatPreviewController_AboutToShow(auto original, ChatPreviewController* _this)
+static void ChatPreviewController_AboutToShow(auto original, ChatPreviewController* _this)
 {
   original(_this);
 
@@ -99,7 +99,7 @@ void ChatPreviewController_AboutToShow(auto original, ChatPreviewController* _th
   }
 }
 
-void ChatPreviewController_OnPanelFocused(auto original, ChatPreviewController* _this, int32_t index)
+static void ChatPreviewController_OnPanelFocused(auto original, ChatPreviewController* _this, int32_t index)
 {
   static const auto disableGalaxyChat = Config::Get().disable_galaxy_chat;
   static const auto disableVeilChat   = Config::Get().disable_veil_chat;
@@ -124,7 +124,7 @@ void ChatPreviewController_OnPanelFocused(auto original, ChatPreviewController* 
   original(_this, index);
 }
 
-void ChatPreviewController_OnGlobalMessageReceived(auto original, ChatPreviewController* _this, void* message)
+static void ChatPreviewController_OnGlobalMessageReceived(auto original, ChatPreviewController* _this, void* message)
 {
   if (Config::Get().disable_galaxy_chat)
     return;
@@ -132,12 +132,20 @@ void ChatPreviewController_OnGlobalMessageReceived(auto original, ChatPreviewCon
   original(_this, message);
 }
 
-void ChatPreviewController_OnRegionalMessageReceived(auto original, ChatPreviewController* _this, void* message)
+static void ChatPreviewController_OnRegionalMessageReceived(auto original, ChatPreviewController* _this, void* message)
 {
   if (Config::Get().disable_veil_chat)
     return;
 
   original(_this, message);
+}
+
+static void ArmadaManager_SendArmadaCreationMessageToAllianceChat(auto original, void* _this, void* armada, int32_t level, int32_t rarity)
+{
+  if (Config::Get().suppress_armada_creation_msg)
+    return;
+  
+  original(_this, armada, level, rarity);
 }
 
 void InstallChatPatches()
@@ -186,6 +194,17 @@ void InstallChatPatches()
       ErrorMsg::MissingMethod("ChatPreviewController", "OnRegionalMessageReceived");
     } else {
       SPUD_STATIC_DETOUR(ptr, ChatPreviewController_OnRegionalMessageReceived);
+    }
+  }
+
+  if (auto armada_manager = il2cpp_get_class_helper("Assembly-CSharp", "Digit.Prime.Armadas", "ArmadaManager");
+    !armada_manager.isValidHelper()) {
+    ErrorMsg::MissingHelper("Armadas", "ArmadaManager");
+  } else {
+    if (const auto ptr = armada_manager.GetMethod("SendArmadaCreationMessageToAllianceChat"); ptr == nullptr) {
+      ErrorMsg::MissingMethod("ArmadaManager", "SendArmadaCreationMessageToAllianceChat");
+    } else {
+      SPUD_STATIC_DETOUR(ptr, ArmadaManager_SendArmadaCreationMessageToAllianceChat);
     }
   }
 }
