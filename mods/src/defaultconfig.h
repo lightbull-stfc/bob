@@ -54,7 +54,7 @@ namespace Graphics
 #endif
   constexpr const char* loader_image                = "";   // Empty = use embedded fallback
   constexpr auto        loader_logo_scale           = 1.0;  // multiplier for logo size
-  constexpr bool        loader_tip_enabled           = true; // show custom tip on loading screen
+  constexpr bool        loader_tip_enabled          = true; // show custom tip on loading screen
 } // namespace Graphics
 
 namespace Patches
@@ -64,8 +64,8 @@ namespace Patches
   constexpr bool freeresizehooks            = true;
   constexpr bool game_version               = true;
   constexpr bool hotkeyhooks                = true;
-  constexpr bool loadingscreenhooks           = true;
-  constexpr bool transitionscreenhooks          = true;
+  constexpr bool loadingscreenhooks         = true;
+  constexpr bool transitionscreenhooks      = true;
   constexpr bool objecttracker              = true;
   constexpr bool panhooks                   = true;
   constexpr bool resolutionlistfix          = false;
@@ -203,32 +203,33 @@ namespace Sync
 
 namespace UI
 {
-  constexpr bool        always_skip_reveal_sequence = true;
-  constexpr bool        auto_confirm_discovery      = true;
-  constexpr bool        auto_open_bulk_claim_flyout = false;
-  constexpr bool        disable_escape_exit         = true;
-  constexpr bool        disable_first_popup         = false;
-  constexpr bool        disable_galaxy_chat         = false;
-  constexpr bool        disable_move_keys           = false;
-  constexpr bool        disable_preview_locate      = false;
-  constexpr bool        disable_preview_recall      = false;
-  constexpr bool        disable_toast_banners       = false;
-  constexpr bool        disable_veil_chat           = false;
-  constexpr const char* disabled_banner_types       = "";
-  constexpr const char* hud_daily_goals             = "auto";
-  constexpr const char* hud_field_training          = "auto";
-  constexpr const char* hud_missions                = "auto";
-  constexpr const char* hud_outposts                = "auto";
-  constexpr const char* hud_q_trials                = "auto";
-  constexpr const char* notify_banner_types         = "";
-  constexpr auto        extend_donation_max         = 80;
-  constexpr bool        extend_donation_slider      = true;
-  constexpr bool        show_armada_cargo           = true;
-  constexpr bool        show_cargo_default          = true;
-  constexpr bool        show_hostile_cargo          = true;
-  constexpr bool        show_player_cargo           = true;
-  constexpr bool        show_station_cargo          = true;
-  constexpr int         cargo_significant_decimals  = 2; // decimal places for abbreviated cargo values (e.g. 1.25M)
+  constexpr bool        always_skip_reveal_sequence  = true;
+  constexpr bool        auto_confirm_discovery       = true;
+  constexpr bool        auto_open_bulk_claim_flyout  = false;
+  constexpr bool        disable_escape_exit          = false;
+  constexpr bool        disable_first_popup          = false;
+  constexpr bool        disable_galaxy_chat          = false;
+  constexpr bool        disable_move_keys            = false;
+  constexpr bool        disable_preview_locate       = false;
+  constexpr bool        disable_preview_recall       = false;
+  constexpr bool        disable_toast_banners        = false;
+  constexpr bool        disable_veil_chat            = false;
+  constexpr bool        suppress_armada_creation_msg = false;
+  constexpr const char* disabled_banner_types        = "";
+  constexpr const char* hud_daily_goals              = "auto";
+  constexpr const char* hud_field_training           = "auto";
+  constexpr const char* hud_missions                 = "auto";
+  constexpr const char* hud_outposts                 = "auto";
+  constexpr const char* hud_q_trials                 = "auto";
+  constexpr const char* notify_banner_types          = "";
+  constexpr auto        extend_donation_max          = 80;
+  constexpr bool        extend_donation_slider       = true;
+  constexpr bool        show_armada_cargo            = true;
+  constexpr bool        show_cargo_default           = false;
+  constexpr bool        show_hostile_cargo           = true;
+  constexpr bool        show_player_cargo            = true;
+  constexpr bool        show_station_cargo           = true;
+  constexpr int         cargo_significant_decimals   = 2; // decimal places for abbreviated cargo values (e.g. 1.25M)
 } // namespace UI
 
 } // namespace DefaultConfig
