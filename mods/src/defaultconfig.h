@@ -64,7 +64,7 @@ namespace Graphics
 #endif
   constexpr const char* loader_image                = "";   // Empty = use embedded fallback
   constexpr auto        loader_logo_scale           = 1.0;  // multiplier for logo size
-  constexpr bool        loader_tip_enabled           = true; // show custom tip on loading screen
+  constexpr bool        loader_tip_enabled          = true; // show custom tip on loading screen
 } // namespace Graphics
 
 namespace Patches
@@ -74,8 +74,8 @@ namespace Patches
   constexpr bool freeresizehooks            = true;
   constexpr bool game_version               = true;
   constexpr bool hotkeyhooks                = true;
-  constexpr bool loadingscreenhooks           = true;
-  constexpr bool transitionscreenhooks          = true;
+  constexpr bool loadingscreenhooks         = true;
+  constexpr bool transitionscreenhooks      = true;
   constexpr bool objecttracker              = true;
   constexpr bool panhooks                   = true;
   constexpr bool syncpatches                = true;
@@ -223,46 +223,47 @@ namespace Sync
 
 namespace UI
 {
-  constexpr bool        always_skip_reveal_sequence = true;
-  constexpr bool        arrow_keys_to_select_ship   = true;
-  constexpr bool        auto_confirm_discovery      = true;
-  constexpr bool        auto_confirm_ft_upgrade     = false;
-  constexpr bool        auto_open_bulk_claim_flyout = false;
-  constexpr const char* daily_bulk_claim_factions   = "";
+  constexpr bool        always_skip_reveal_sequence        = true;
+  constexpr bool        arrow_keys_to_select_ship          = true;
+  constexpr bool        auto_confirm_discovery             = true;
+  constexpr bool        auto_confirm_ft_upgrade            = false;
+  constexpr bool        auto_open_bulk_claim_flyout        = false;
+  constexpr const char* daily_bulk_claim_factions          = "";
   constexpr bool        daily_bulk_claim_toggle_default_on = false;
-  constexpr bool        disable_escape_exit         = true;
+  constexpr bool        disable_escape_exit                = true;
   // Maximum gap between Escape presses that opens the exit prompt.
   // 0 disables double-tap and preserves the existing blocked behavior.
-  constexpr auto        disable_escape_exit_timer           = 0;
-  constexpr bool        disable_first_popup         = false;
-  constexpr bool        disable_galaxy_chat         = false;
-  constexpr bool        disable_move_keys           = false;
-  constexpr bool        disable_preview_locate      = false;
-  constexpr bool        disable_preview_recall      = false;
-  constexpr bool        disable_toast_banners       = false;
-  constexpr bool        disable_veil_chat           = false;
-  constexpr bool        double_click_to_assign_ship = false;
-  constexpr const char* disabled_banner_types       = "";
-  constexpr const char* hud_daily_goals             = "auto";
-  constexpr const char* hud_field_training          = "auto";
-  constexpr const char* hud_missions                = "auto";
-  constexpr const char* hud_outposts                = "auto";
-  constexpr const char* hud_q_trials                = "auto";
-  constexpr const char* auto_confirm_instant_warp   = "none";
-  constexpr const char* instant_warp_auto_jump     = "";
-  constexpr const char* instant_warp_auto_warp     = "";
-  constexpr const char* instant_warp_always_ask    = "";
-  constexpr const char* pinned_ships                = "";
-  constexpr const char* notify_banner_types         = "";
-  constexpr auto        extend_chest_purchase_max   = 160;
-  constexpr auto        extend_donation_max         = 80;
-  constexpr bool        extend_donation_slider      = true;
-  constexpr bool        show_armada_cargo           = true;
-  constexpr bool        show_cargo_default          = true;
-  constexpr bool        show_hostile_cargo          = true;
-  constexpr bool        show_player_cargo           = true;
-  constexpr bool        show_station_cargo          = true;
-  constexpr int         cargo_significant_decimals  = 2; // decimal places for abbreviated cargo values (e.g. 1.25M)
+  constexpr auto        disable_escape_exit_timer    = 0;
+  constexpr bool        disable_first_popup          = false;
+  constexpr bool        disable_galaxy_chat          = false;
+  constexpr bool        disable_move_keys            = false;
+  constexpr bool        disable_preview_locate       = false;
+  constexpr bool        disable_preview_recall       = false;
+  constexpr bool        disable_toast_banners        = false;
+  constexpr bool        disable_veil_chat            = false;
+  constexpr bool        suppress_armada_creation_msg = false;
+  constexpr bool        double_click_to_assign_ship  = false;
+  constexpr const char* disabled_banner_types        = "";
+  constexpr const char* hud_daily_goals              = "auto";
+  constexpr const char* hud_field_training           = "auto";
+  constexpr const char* hud_missions                 = "auto";
+  constexpr const char* hud_outposts                 = "auto";
+  constexpr const char* hud_q_trials                 = "auto";
+  constexpr const char* auto_confirm_instant_warp    = "none";
+  constexpr const char* instant_warp_auto_jump       = "";
+  constexpr const char* instant_warp_auto_warp       = "";
+  constexpr const char* instant_warp_always_ask      = "";
+  constexpr const char* pinned_ships                 = "";
+  constexpr const char* notify_banner_types          = "";
+  constexpr auto        extend_chest_purchase_max    = 160;
+  constexpr auto        extend_donation_max          = 80;
+  constexpr bool        extend_donation_slider       = true;
+  constexpr bool        show_armada_cargo            = true;
+  constexpr bool        show_cargo_default           = true;
+  constexpr bool        show_hostile_cargo           = true;
+  constexpr bool        show_player_cargo            = true;
+  constexpr bool        show_station_cargo           = true;
+  constexpr int         cargo_significant_decimals   = 2; // decimal places for abbreviated cargo values (e.g. 1.25M)
 } // namespace UI
 
 } // namespace DefaultConfig

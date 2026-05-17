@@ -207,6 +207,7 @@ public:
   int  disable_escape_exit_timer;
   bool disable_galaxy_chat;
   bool disable_veil_chat;
+  bool suppress_armada_creation_msg;
   bool disable_first_popup;
   bool disable_toast_banners;
   bool trace_audio_events;
