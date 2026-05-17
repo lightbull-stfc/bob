@@ -1239,6 +1239,8 @@ void Config::Load()
       get_config_or_default(config, parsed, "ui", "disable_galaxy_chat", DCU::disable_galaxy_chat, write_config);
   this->disable_veil_chat =
       get_config_or_default(config, parsed, "ui", "disable_veil_chat", DCU::disable_veil_chat, write_config);
+  this->suppress_armada_creation_msg =
+      get_config_or_default(config, parsed, "ui", "suppress_armada_creation_msg", DCU::suppress_armada_creation_msg, write_config);
   this->show_player_title =
       get_config_or_default(config, parsed, "ui", "show_player_title", DCU::show_player_title, write_config);
   this->show_cargo_default =

@@ -290,6 +290,7 @@ namespace UI
   constexpr bool        disable_preview_recall      = false;
   constexpr bool        disable_toast_banners       = false;
   constexpr bool        disable_veil_chat           = false;
+  constexpr bool        suppress_armada_creation_msg = false;
   constexpr bool        show_player_title           = true;
   constexpr bool        disable_exchange_all        = false;
   constexpr bool        double_click_to_assign_ship = false;
