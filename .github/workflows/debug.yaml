@@ -1,0 +1,49 @@
+name: Build (releasedbg)
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-win:
+    runs-on: windows-2025-vs2026
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          submodules: "recursive"
+
+      - name: Setup
+        uses: xmake-io/github-action-setup-xmake@v1
+        with:
+          xmake-version: latest
+          package-cache: true
+          package-cache-key: ${{ hashFiles('**/xmake.lua', '!macos-*/xmake.lua') }}
+
+      - name: Configure
+        run: xmake f -m releasedbg -y
+
+      - name: Build
+        run: xmake -y
+
+      - name: Package
+        run: |
+          mv build/windows/x64/releasedbg/stfc-community-mod.dll version.dll
+          mv build/windows/x64/releasedbg/stfc-community-mod.pdb version.pdb
+
+      - name: Upload DLL
+        uses: actions/upload-artifact@v7
+        with:
+          name: stfc-community-mod
+          path: version.dll
+          if-no-files-found: error
+
+      - name: Upload Debug symbols
+        uses: actions/upload-artifact@v7
+        with:
+          name: stfc-community-mod-symbols
+          path: version.pdb
+          if-no-files-found: error
