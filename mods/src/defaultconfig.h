@@ -18,6 +18,13 @@ namespace Audio
   constexpr const char* alert_armada_battle_lost = "none";
 } // namespace Audio
 
+namespace BattleCsvExport
+{
+  constexpr bool        enabled         = false;
+  constexpr bool        export_existing = false;
+  constexpr const char* directory       = "";
+} // namespace BattleCsvExport
+
 namespace SystemConfig
 {
   constexpr const char* assets_url_override = "";

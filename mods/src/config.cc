@@ -26,9 +26,10 @@ namespace DCP  = DefaultConfig::Patches;
 namespace DCA  = DefaultConfig::Audio;
 namespace DCG  = DefaultConfig::Graphics;
 namespace DCC  = DefaultConfig::Control;
-namespace DCU  = DefaultConfig::UI;
-namespace DCBS = DefaultConfig::Buffs;
-namespace DCS  = DefaultConfig::Sync;
+namespace DCU   = DefaultConfig::UI;
+namespace DCBS  = DefaultConfig::Buffs;
+namespace DCBCE = DefaultConfig::BattleCsvExport;
+namespace DCS   = DefaultConfig::Sync;
 namespace DCSC = DefaultConfig::SystemConfig;
 namespace DCSH = DefaultConfig::Shortcuts;
 
@@ -1271,6 +1272,15 @@ void Config::Load()
       "missions", get_mission_hud_visibility(config, parsed, "hud_missions", DCU::hud_missions, write_config));
   this->disable_exchange_all = get_config_or_default_with_alias(
       config, parsed, "ui", "disable_exchange_all", "hide_artifact_exchange_all", DCU::disable_exchange_all, write_config);
+
+  spdlog::debug("");
+
+  this->battle_csv_export_enabled = get_config_or_default(
+      config, parsed, "battle_csv_export", "enabled", DCBCE::enabled, write_config);
+  this->battle_csv_export_existing = get_config_or_default(
+      config, parsed, "battle_csv_export", "export_existing", DCBCE::export_existing, write_config);
+  this->battle_csv_export_directory = get_config_or_default<std::string>(
+      config, parsed, "battle_csv_export", "directory", DCBCE::directory, write_config);
 
   spdlog::debug("");
 

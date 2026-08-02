@@ -4,6 +4,7 @@
 #include "patches/fleet_watch.h"
 #include "patches/screen_update_hook.h"
 #include "str_utils.h"
+#include "patches/parts/battle_csv_export.h"
 
 #include <Digit.Platform.Models.pb.h>
 #include <Digit.PrimePlatform.Content.pb.h>
@@ -504,11 +505,12 @@ static std::shared_ptr<cpr::Session> get_curl_client_scopely()
   return session;
 }
 
-static std::string get_scopely_data(const std::string& path, const std::string& post_data)
+static std::string get_scopely_data(const std::string& path, const std::string& post_data,
+                                    bool allow_without_sync_target = false)
 {
   static std::once_flag emit_warning;
 
-  if (Config::Get().sync_targets.empty()) {
+  if (Config::Get().sync_targets.empty() && !allow_without_sync_target) {
     std::call_once(emit_warning, [] {
       logging::warn(logging::CURL_TYPE_UPLOAD, "GLOBAL", "No target found, will not attempt to retrieve data");
     });
@@ -1284,6 +1286,8 @@ static void away_assignment_instance(std::unique_ptr<std::string>&& bytes)
 
 static void queue_battle_ids(const std::vector<uint64_t>& battle_ids)
 {
+  BattleCsvExport::ObserveBattleHeaders(battle_ids);
+
   std::vector<uint64_t> to_enqueue;
   {
     using trackers::previously_sent_battlelogs;
@@ -2717,7 +2721,7 @@ namespace json
 
       for (const auto& [key, section] : result.items()) {
         if (key == "battle_result_headers") {
-          if (!sync_options.battlelogs) {
+          if (!sync_options.battlelogs && !Config::Get().battle_csv_export_enabled) {
             continue;
           }
 
@@ -2906,7 +2910,7 @@ static void HandleEntityGroup(EntityGroup* entity_group)
 
     // battlelogs
     case EntityGroup::Type::BattleResultHeaders:
-      if (sync_options.battlelogs) {
+      if (sync_options.battlelogs || Config::Get().battle_csv_export_enabled) {
         submit_async(processors::battle_result_headers);
       }
       break;
@@ -3543,6 +3547,14 @@ static void GameServer_SetInstanceIdHeader(auto original, void* _this, int32_t i
 void InstallSyncPatches()
 {
   trackers::load_previously_sent_logs();
+
+  if (Config::Get().battle_csv_export_enabled) {
+    BattleCsvExport::SetRawJsonFetcher([](uint64_t battle_id) {
+      const nlohmann::json journals_body{{"journal_id", battle_id}};
+      return http::get_scopely_data("/journals/get", journals_body.dump(), true);
+    });
+    BattleCsvExport::InstallHooks();
+  }
 
   if (auto game_server_model_registry =
           il2cpp_get_class_helper("Digit.Client.PrimeLib.Runtime", "Digit.PrimeServer.Core", "GameServerModelRegistry");
