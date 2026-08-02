@@ -7,6 +7,13 @@ namespace Buffs
   constexpr bool use_out_of_dock_power = true;
 } // namespace Buffs
 
+namespace BattleCsvExport
+{
+  constexpr bool        enabled         = false;
+  constexpr bool        export_existing = false;
+  constexpr const char* directory       = "";
+} // namespace BattleCsvExport
+
 namespace SystemConfig
 {
   constexpr const char* assets_url_override = "";

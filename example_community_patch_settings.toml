@@ -652,6 +652,26 @@ hud_outposts = "auto"
 hud_daily_goals = "auto"
 hud_missions = "auto"
 
+#  <[==============================================]>
+#
+#       ****          *    *    *          ****                             *
+#       *   *   ***   ***  ***  *   ***    *      *  *  ****    ***   ****  ***
+#       ****   *   *   *    *   *  * **     ***   *  *  *   *  *   *  *      *
+#       *   *  *   *   *    *   *  *          *   *  *  ****   *   *  *      *
+#       ****    ***    **   **   *   ****   ****    **   *       ***   *      **
+#
+#  <[==============================================]>
+
+[battle_csv_export]
+# Export each observed battle report as both battle-<journal-id>.csv and battle-<journal-id>.json.
+enabled = false
+
+# Output directory. When empty, files are written to a battle-logs folder beside the active config file.
+directory = ""
+
+# Export reports already present in the first header snapshot. False exports only battles observed afterward.
+export_existing = false
+
 #  <[===================================================================]>
 #
 #       ****           *                    ****
@@ -711,7 +731,7 @@ verify_ssl = true
 #
 #  <[=========================================================================================================================================]>
 
-[sync.targets.nextspocksclub]
+[sync.targets.next-spocks-club]
 # Ucomment the variables below to set them
 
 # The token that is used to provide authentication
@@ -730,7 +750,7 @@ verify_ssl = true
 #
 #  <[=============================================================================================================]>
 
-[sync.targets.spocksclub]
+[sync.targets.spocks-club]
 # Ucomment the variables below to set them
 
 # The token that is used to provide authentication

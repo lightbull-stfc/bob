@@ -193,6 +193,10 @@ public:
   bool                                        always_skip_reveal_sequence;
   std::map<std::string, MissionHudVisibility> mission_hud_buttons;
 
+  bool        battle_csv_export_enabled;
+  bool        battle_csv_export_existing;
+  std::string battle_csv_export_directory;
+
   bool       sync_logging;
   bool       sync_debug;
   int        sync_resolver_cache_ttl;
