@@ -25,111 +25,52 @@ struct FakeVector2 { float x, y; };
 struct FakeVector3 { float x, y, z; };
 struct FakeColor { float r, g, b, a; };
 
-inline Il2CppObject* InvokeRuntime(const MethodInfo* method, void* target, void** args, const char* name)
-{
-  if (!method) return nullptr;
-  Il2CppException* exception = nullptr;
-  Il2CppObject*    result    = il2cpp_runtime_invoke(method, target, args, &exception);
-  if (exception) {
-    spdlog::warn("[LS] {} invocation failed", name);
-    return nullptr;
-  }
-  return result;
-}
-
-inline bool InvokeVoid(const MethodInfo* method, void* target, void** args, const char* name)
-{
-  if (!method) return false;
-  Il2CppException* exception = nullptr;
-  il2cpp_runtime_invoke(method, target, args, &exception);
-  if (exception) {
-    spdlog::warn("[LS] {} invocation failed", name);
-    return false;
-  }
-  return true;
-}
-
-inline bool InvokeBool(const MethodInfo* method, void* target, void** args, const char* name)
-{
-  Il2CppObject* result = InvokeRuntime(method, target, args, name);
-  if (!result) return false;
-  void* value = il2cpp_object_unbox(result);
-  return value ? *reinterpret_cast<bool*>(value) : false;
-}
-
-inline int32_t InvokeInt32(const MethodInfo* method, void* target, int32_t fallback, const char* name)
-{
-  Il2CppObject* result = InvokeRuntime(method, target, nullptr, name);
-  if (!result) return fallback;
-  void* value = il2cpp_object_unbox(result);
-  return value ? *reinterpret_cast<int32_t*>(value) : fallback;
-}
-
-inline void* InvokeObject(const MethodInfo* method, void* target, void** args, const char* name)
-{
-  return InvokeRuntime(method, target, args, name);
-}
-
 inline void SetFullRect(void* rt, FakeVector2 aMin, FakeVector2 aMax, FakeVector2 pivot, FakeVector2 sd, FakeVector2 ap)
 {
   if (!rt) return;
   static auto rt_h  = il2cpp_get_class_helper("UnityEngine.CoreModule", "UnityEngine", "RectTransform");
-  static auto fn_am = rt_h.GetMethodInfo("set_anchorMin");
-  static auto fn_ax = rt_h.GetMethodInfo("set_anchorMax");
-  static auto fn_pv = rt_h.GetMethodInfo("set_pivot");
-  static auto fn_sd = rt_h.GetMethodInfo("set_sizeDelta");
-  static auto fn_ap = rt_h.GetMethodInfo("set_anchoredPosition");
+  static auto fn_am = rt_h.GetInvokeMethod<void, FakeVector2>("set_anchorMin");
+  static auto fn_ax = rt_h.GetInvokeMethod<void, FakeVector2>("set_anchorMax");
+  static auto fn_pv = rt_h.GetInvokeMethod<void, FakeVector2>("set_pivot");
+  static auto fn_sd = rt_h.GetInvokeMethod<void, FakeVector2>("set_sizeDelta");
+  static auto fn_ap = rt_h.GetInvokeMethod<void, FakeVector2>("set_anchoredPosition");
   if (!fn_am || !fn_ax || !fn_pv || !fn_sd || !fn_ap) return;
-  void* amA[1] = {&aMin};
-  void* axA[1] = {&aMax};
-  void* pvA[1] = {&pivot};
-  void* sdA[1] = {&sd};
-  void* apA[1] = {&ap};
-  InvokeVoid(fn_am, rt, amA, "RT.set_anchorMin");
-  InvokeVoid(fn_ax, rt, axA, "RT.set_anchorMax");
-  InvokeVoid(fn_pv, rt, pvA, "RT.set_pivot");
-  InvokeVoid(fn_sd, rt, sdA, "RT.set_sizeDelta");
-  InvokeVoid(fn_ap, rt, apA, "RT.set_anchoredPosition");
+  fn_am.Invoke(rt, aMin);
+  fn_ax.Invoke(rt, aMax);
+  fn_pv.Invoke(rt, pivot);
+  fn_sd.Invoke(rt, sd);
+  fn_ap.Invoke(rt, ap);
 }
 
 inline void* CreateSpriteFromTexture(void* tex, int32_t width, int32_t height)
 {
   if (!tex || width <= 0 || height <= 0) return nullptr;
   static auto spr_h  = il2cpp_get_class_helper("UnityEngine.CoreModule", "UnityEngine", "Sprite");
-  static auto fn_cre = spr_h.GetMethodInfo("Create", 3);
+  static auto fn_cre = spr_h.GetInvokeMethod<void*, void*, FakeRect, FakeVector2>("Create");
   if (!fn_cre) return nullptr;
   FakeRect    rect{0.0f, 0.0f, static_cast<float>(width), static_cast<float>(height)};
   FakeVector2 pivot{0.5f, 0.5f};
-  void*       args[3] = {tex, &rect, &pivot};
-  return InvokeObject(fn_cre, nullptr, args, "Sprite.Create");
+  return fn_cre.Invoke(nullptr, tex, rect, pivot);
 }
 
 inline bool ConfigureImageSprite(void* imgComp, void* spr, bool preserveAspect)
 {
   if (!imgComp || !spr) return false;
   static auto img_h  = il2cpp_get_class_helper("UnityEngine.UI", "UnityEngine.UI", "Image");
-  static auto fn_spr = img_h.GetMethodInfo("set_sprite");
-  static auto fn_col = img_h.GetMethodInfo("set_color");
-  static auto fn_typ = img_h.GetMethodInfo("set_type");
-  static auto fn_asp = img_h.GetMethodInfo("set_preserveAspect");
-  static auto fn_ray = img_h.GetMethodInfo("set_raycastTarget");
+  static auto fn_spr = img_h.GetInvokeMethod<void, void*>("set_sprite");
+  static auto fn_col = img_h.GetInvokeMethod<void, FakeColor>("set_color");
+  static auto fn_typ = img_h.GetInvokeMethod<void, int32_t>("set_type");
+  static auto fn_asp = img_h.GetInvokeMethod<void, bool>("set_preserveAspect");
+  static auto fn_ray = img_h.GetInvokeMethod<void, bool>("set_raycastTarget");
   if (!fn_spr || !fn_col || !fn_typ || !fn_asp) return false;
 
-  bool        ok         = true;
-  void*       sprArgs[1] = {spr};
-  ok &= InvokeVoid(fn_spr, imgComp, sprArgs, "Image.set_sprite");
+  bool      ok = fn_spr.Invoke(imgComp, spr);
   FakeColor white{1.0f, 1.0f, 1.0f, 1.0f};
-  void*     colArgs[1] = {&white};
-  ok &= InvokeVoid(fn_col, imgComp, colArgs, "Image.set_color");
-  int32_t simple     = 0;
-  void*   typArgs[1] = {&simple};
-  ok &= InvokeVoid(fn_typ, imgComp, typArgs, "Image.set_type");
-  void* aspArgs[1] = {&preserveAspect};
-  ok &= InvokeVoid(fn_asp, imgComp, aspArgs, "Image.set_preserveAspect");
+  ok &= fn_col.Invoke(imgComp, white);
+  ok &= fn_typ.Invoke(imgComp, int32_t{0});
+  ok &= fn_asp.Invoke(imgComp, preserveAspect);
   if (fn_ray) {
-    bool  rayOff    = false;
-    void* rayArgs[1] = {&rayOff};
-    ok &= InvokeVoid(fn_ray, imgComp, rayArgs, "Image.set_raycastTarget(false)");
+    ok &= fn_ray.Invoke(imgComp, false);
   }
   return ok;
 }
@@ -138,10 +79,9 @@ inline void HideImage(void* imgComp)
 {
   if (!imgComp) return;
   static auto img_h  = il2cpp_get_class_helper("UnityEngine.UI", "UnityEngine.UI", "Image");
-  static auto fn_col = img_h.GetMethodInfo("set_color");
+  static auto fn_col = img_h.GetInvokeMethod<void, FakeColor>("set_color");
   FakeColor   clear{0.0f, 0.0f, 0.0f, 0.0f};
-  void*       args[1] = {&clear};
-  InvokeVoid(fn_col, imgComp, args, "Image.set_color (transparent)");
+  fn_col.Invoke(imgComp, clear);
 }
 
 inline void SafeDestroy(void* obj)
@@ -149,11 +89,8 @@ inline void SafeDestroy(void* obj)
   if (!obj) return;
   try {
     static auto obj_h      = il2cpp_get_class_helper("UnityEngine.CoreModule", "UnityEngine", "Object");
-    static auto fn_destroy = obj_h.GetMethodInfo("Destroy", 1);
-    if (fn_destroy) {
-      void* args[1] = {obj};
-      InvokeVoid(fn_destroy, nullptr, args, "Object.Destroy");
-    }
+    static auto fn_destroy = obj_h.GetInvokeMethod<void, void*>("Destroy");
+    if (fn_destroy) fn_destroy.Invoke(nullptr, obj);
   } catch (...) {}
 }
 
@@ -195,9 +132,10 @@ inline Il2CppGCHandle LoadTextureFromBytes(const uint8_t* data, size_t size)
   if (!data || size == 0) return nullptr;
   static auto tex_h   = il2cpp_get_class_helper("UnityEngine.CoreModule", "UnityEngine", "Texture2D");
   static auto conv_h  = il2cpp_get_class_helper("UnityEngine.ImageConversionModule", "UnityEngine", "ImageConversion");
-  static auto fn_load = conv_h.GetMethodInfoSpecial("LoadImage", [](int param_count, const Il2CppType** param) {
-    return param_count == 3 && param[1]->type == IL2CPP_TYPE_SZARRAY && param[2]->type == IL2CPP_TYPE_BOOLEAN;
-  });
+  static auto fn_load = conv_h.GetInvokeMethodSpecial<bool, void*, void*, bool>(
+      "LoadImage", [](int param_count, const Il2CppType** param) {
+        return param_count == 3 && param[1]->type == IL2CPP_TYPE_SZARRAY && param[2]->type == IL2CPP_TYPE_BOOLEAN;
+      });
   if (!tex_h.isValidHelper() || !fn_load) return nullptr;
 
   static auto  byte_h = il2cpp_get_class_helper("mscorlib", "System", "Byte");
@@ -218,24 +156,22 @@ inline Il2CppGCHandle LoadTextureFromBytes(const uint8_t* data, size_t size)
     return nullptr;
   }
 
-  static auto ctor = tex_h.GetMethodInfoSpecial(".ctor", [](int param_count, const Il2CppType** param) {
-    return param_count == 4 && param[3]->type == IL2CPP_TYPE_BOOLEAN;
-  });
+  static auto ctor = tex_h.GetInvokeMethodSpecial<void, int32_t, int32_t, int32_t, bool>(
+      ".ctor", [](int param_count, const Il2CppType** param) {
+        return param_count == 4 && param[3]->type == IL2CPP_TYPE_BOOLEAN;
+      });
   if (ctor) {
     int32_t width = 2, height = 2, textureFormat = 4;
     bool    mipChain    = false;
-    void*   ctorArgs[4] = {&width, &height, &textureFormat, &mipChain};
-    if (!InvokeVoid(ctor, il2cpp_gchandle_get_target(texture_handle), ctorArgs, "Texture2D.ctor")) {
+    if (!ctor.Invoke(il2cpp_gchandle_get_target(texture_handle), width, height, textureFormat, mipChain)) {
       il2cpp_gchandle_free(bytes_handle);
       il2cpp_gchandle_free(texture_handle);
       return nullptr;
     }
   }
 
-  bool  markNonReadable = false;
-  void* loadArgs[3]     = {il2cpp_gchandle_get_target(texture_handle), il2cpp_gchandle_get_target(bytes_handle),
-                           &markNonReadable};
-  const bool loaded = InvokeBool(fn_load, nullptr, loadArgs, "ImageConversion.LoadImage");
+  const bool loaded = fn_load.Invoke(nullptr, il2cpp_gchandle_get_target(texture_handle),
+                                     il2cpp_gchandle_get_target(bytes_handle), false);
   il2cpp_gchandle_free(bytes_handle);
   if (!loaded) {
     il2cpp_gchandle_free(texture_handle);
@@ -421,14 +357,15 @@ inline void* CreateImageOverlay(const char* name, RootedImageAsset& asset, void*
   static auto tr_h  = il2cpp_get_class_helper("UnityEngine.CoreModule", "UnityEngine", "Transform");
   static auto img_h = il2cpp_get_class_helper("UnityEngine.UI", "UnityEngine.UI", "Image");
 
-  static auto fn_go_ctor = go_h.GetMethodInfoSpecial(".ctor", [](int n, const Il2CppType** p) {
+  static auto fn_go_ctor = go_h.GetInvokeMethodSpecial<void, void*>(".ctor", [](int n, const Il2CppType** p) {
     return n == 1 && p[0]->type == IL2CPP_TYPE_STRING;
   });
-  static auto fn_get_tr  = go_h.GetMethodInfo("get_transform");
-  static auto fn_setpar  = tr_h.GetMethodInfoSpecial("SetParent", [](int n, const Il2CppType**) { return n == 2; });
-  static auto fn_setfst  = tr_h.GetMethodInfo("SetAsFirstSibling");
-  static auto fn_addcomp = go_h.GetMethodInfo("AddComponent", 1);
-  static auto fn_gc      = go_h.GetMethodInfo("GetComponent", 1);
+  static auto fn_get_tr  = go_h.GetInvokeMethod<void*>("get_transform");
+  static auto fn_setpar  = tr_h.GetInvokeMethodSpecial<void, void*, bool>(
+      "SetParent", [](int n, const Il2CppType**) { return n == 2; });
+  static auto fn_setfst  = tr_h.GetInvokeMethod<void>("SetAsFirstSibling");
+  static auto fn_addcomp = go_h.GetInvokeMethod<void*, void*>("AddComponent");
+  static auto fn_gc      = go_h.GetInvokeMethod<void*, void*>("GetComponent");
   if (!fn_go_ctor || !fn_get_tr || !fn_setpar || !fn_addcomp || !fn_gc) return nullptr;
 
   void* spr = asset.Sprite();
@@ -439,34 +376,30 @@ inline void* CreateImageOverlay(const char* name, RootedImageAsset& asset, void*
   Il2CppGCHandle go_handle = il2cpp_gchandle_new(go, false);
   if (!go_handle) return nullptr;
 
-  void* nameStr   = il2cpp_string_new(name);
-  void* goArgs[1] = {nameStr};
-  if (!InvokeVoid(fn_go_ctor, go, goArgs, "GameObject.ctor")) {
+  void* nameStr = il2cpp_string_new(name);
+  if (!fn_go_ctor.Invoke(go, nameStr)) {
     il2cpp_gchandle_free(go_handle);
     return nullptr;
   }
 
-  void* tr = InvokeObject(fn_get_tr, go, nullptr, "get_transform");
+  void* tr = fn_get_tr.Invoke(go);
   if (!tr) {
     il2cpp_gchandle_free(go_handle);
     return nullptr;
   }
-  bool  worldStays = false;
-  void* parArgs[2] = {FindRootCanvas(parentTransform), &worldStays};
-  if (!parArgs[0] || !InvokeVoid(fn_setpar, tr, parArgs, "Transform.SetParent")) {
+  void* rootCanvas = FindRootCanvas(parentTransform);
+  if (!rootCanvas || !fn_setpar.Invoke(tr, rootCanvas, false)) {
     il2cpp_gchandle_free(go_handle);
     return nullptr;
   }
-  if (placeAsFirstSibling && fn_setfst)
-    InvokeVoid(fn_setfst, tr, nullptr, "Transform.SetAsFirstSibling");
+  if (placeAsFirstSibling && fn_setfst) fn_setfst.Invoke(tr);
 
   void* imgType   = img_h.GetType();
   if (!imgType) {
     il2cpp_gchandle_free(go_handle);
     return nullptr;
   }
-  void* acArgs[1] = {imgType};
-  void* imgComp   = InvokeObject(fn_addcomp, go, acArgs, "AddComponent<Image>");
+  void* imgComp = fn_addcomp.Invoke(go, imgType);
   if (!imgComp) {
     il2cpp_gchandle_free(go_handle);
     return nullptr;
@@ -477,8 +410,7 @@ inline void* CreateImageOverlay(const char* name, RootedImageAsset& asset, void*
     il2cpp_gchandle_free(go_handle);
     return nullptr;
   }
-  void* rtArgs[1] = {rtType};
-  void* rt        = InvokeObject(fn_gc, go, rtArgs, "GetComponent<RectTransform>");
+  void* rt = fn_gc.Invoke(go, rtType);
   if (!rt) {
     il2cpp_gchandle_free(go_handle);
     return nullptr;
@@ -509,10 +441,10 @@ inline void CreateLogoOverlayEx(const char* name, RootedImageAsset* asset, void*
     constexpr float kRefPadY        = 185.0f;
 
     static auto screen_h = il2cpp_get_class_helper("UnityEngine.CoreModule", "UnityEngine", "Screen");
-    static auto fn_sw    = screen_h.GetMethodInfo("get_width");
-    static auto fn_sh    = screen_h.GetMethodInfo("get_height");
-    float       sw       = (float)(fn_sw ? InvokeInt32(fn_sw, nullptr, 0, "Screen.get_width") : 0);
-    float       sh       = (float)(fn_sh ? InvokeInt32(fn_sh, nullptr, 0, "Screen.get_height") : 0);
+    static auto fn_sw    = screen_h.GetInvokeMethod<int32_t>("get_width");
+    static auto fn_sh    = screen_h.GetInvokeMethod<int32_t>("get_height");
+    float       sw       = static_cast<float>(fn_sw.Invoke(nullptr));
+    float       sh       = static_cast<float>(fn_sh.Invoke(nullptr));
     if (sw <= 0.0f) sw = 1334.0f;
     if (sh <= 0.0f) sh = 750.0f;
 
@@ -556,12 +488,11 @@ inline void ApplySpriteToImage(void* imageComp, RootedImageAsset& asset)
   void* spr = asset.Sprite();
   if (!spr) return;
   static auto img_h  = il2cpp_get_class_helper("UnityEngine.UI", "UnityEngine.UI", "Image");
-  static auto fn_ovr = img_h.GetMethodInfo("set_overrideSprite");
-  static auto fn_drt = img_h.GetMethodInfo("SetVerticesDirty");
-  void*       sprArgs[1] = {spr};
-  InvokeVoid(fn_ovr, imageComp, sprArgs, "Image.set_overrideSprite");
+  static auto fn_ovr = img_h.GetInvokeMethod<void, void*>("set_overrideSprite");
+  static auto fn_drt = img_h.GetInvokeMethod<void>("SetVerticesDirty");
+  fn_ovr.Invoke(imageComp, spr);
   if (!ConfigureImageSprite(imageComp, spr, false)) return;
-  InvokeVoid(fn_drt, imageComp, nullptr, "Graphic.SetVerticesDirty");
+  fn_drt.Invoke(imageComp);
 }
 
 inline void* CreateBGOverlay(void* parentTransform, RootedImageAsset& asset)
