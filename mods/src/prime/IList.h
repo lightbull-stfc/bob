@@ -10,7 +10,7 @@ public:
   Il2CppObject* Get(int32_t index)
   {
     static auto GetImpl =
-        get_class_helper().GetMethodSpecial2<Il2CppObject*(IList*, int32_t)>((Il2CppObject*)(this), "get_Item");
+        get_class_helper().GetMethodFromObject<Il2CppObject*(IList*, int32_t)>((Il2CppObject*)(this), "get_Item");
     return GetImpl(this, index);
   }
 
