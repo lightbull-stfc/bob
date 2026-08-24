@@ -144,9 +144,9 @@ static std::string il2cpp_object_to_string(Il2CppObject* obj)
   auto* vm = il2cpp_object_get_virtual_method(obj, s_object_tostring);
   if (!vm) return {};
 
-  auto* result = ObjectToStringInvoker(vm).Invoke(obj);
-  if (!result) return {};
-  return to_string(result);
+  const auto result = ObjectToStringInvoker(vm).Invoke(obj);
+  if (!result || !*result) return {};
+  return to_string(*result);
 }
 
 // ---------------------------------------------------------------------------
@@ -182,7 +182,8 @@ static Il2CppString* seh_to_string_raw(Il2CppObject* obj)
   if (!s_object_tostring) return nullptr;
   auto* vm = il2cpp_object_get_virtual_method(obj, s_object_tostring);
   if (!vm) return nullptr;
-  return ObjectToStringInvoker(vm).Invoke(obj);
+  const auto result = ObjectToStringInvoker(vm).Invoke(obj);
+  return result ? *result : nullptr;
 }
 
 static std::string safe_il2cpp_to_string(Il2CppObject* obj, il2cpp_array_size_t index)
@@ -315,10 +316,10 @@ static std::string resolve_toast_text(Toast* toast)
   // parameter substitution internally and returns a fully formatted string.
   if (s_locale_utils_localize) {
     // localizeTextParams = true, invariantCulture = false
-    auto* ret = s_locale_utils_localize.Invoke(nullptr, ltc, true, false);
+    const auto ret = s_locale_utils_localize.Invoke(nullptr, ltc, true, false);
 
     if (ret) {
-      auto result = to_string(ret);
+      auto result = to_string(*ret);
       // LocaleUtilities.Localize may return a template with unresolved {N}
       // placeholders if the LTC's own _textParameters are empty.  The actual
       // parameter values may be in Toast.TextParameters, so run
@@ -337,7 +338,8 @@ static std::string resolve_toast_text(Toast* toast)
     if (!langMgr) return {};
 
     Il2CppString* resolved = nullptr;
-    bool          success  = s_localize_ltc.Invoke(langMgr, &resolved, ltc);
+    const auto result = s_localize_ltc.Invoke(langMgr, &resolved, ltc);
+    bool       success = result ? *result : false;
     if (!success || !resolved) {
       spdlog::debug("[Notify] LanguageManager.Localize returned false for toast state {}", toast->get_State());
       return {};

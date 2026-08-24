@@ -130,7 +130,7 @@ static void ApplyTransitionCustomization(void* _this)
       if (fn_animField.isValidHelper() && fn_setEn) {
         void* anim = *reinterpret_cast<void**>((char*)_this + fn_animField.offset());
         if (anim) {
-          fn_setEn.Invoke(anim, false);
+          static_cast<void>(fn_setEn.Invoke(anim, false));
           g_canvasAnimator = anim;
         }
       }
@@ -167,12 +167,12 @@ static void ApplyTransitionCustomization(void* _this)
         static auto fn_eu = tr_h.GetInvokeMethod<void, ls::FakeVector3>("set_localEulerAngles");
         if (fn_eu) {
           ls::FakeVector3 z{0, 0, 0};
-          fn_eu.Invoke(g_bgRectTransform, z);
+          static_cast<void>(fn_eu.Invoke(g_bgRectTransform, z));
         }
         static auto fn_sc = tr_h.GetInvokeMethod<void, ls::FakeVector3>("set_localScale");
         if (fn_sc) {
           ls::FakeVector3 o{1, 1, 1};
-          fn_sc.Invoke(g_bgRectTransform, o);
+          static_cast<void>(fn_sc.Invoke(g_bgRectTransform, o));
         }
       }
 
@@ -271,7 +271,7 @@ static void TVC_AboutToHide_Hook(auto original, void* _this)
       static auto behav_h  = il2cpp_get_class_helper("UnityEngine.CoreModule", "UnityEngine", "Behaviour");
       static auto fn_setEn = behav_h.GetInvokeMethod<void, bool>("set_enabled");
       if (fn_setEn) {
-        fn_setEn.Invoke(g_canvasAnimator, true);
+        static_cast<void>(fn_setEn.Invoke(g_canvasAnimator, true));
       }
     }
   } catch (...) {}
