@@ -199,21 +199,17 @@ void UpdateFleetLabelThreshold()
 vec3 GetMouseWorldPos(void *cam, vec3 *pos)
 {
   static auto class_helper = il2cpp_get_class_helper("Digit.Client.PrimeLib.Runtime", "Digit.Client.Core", "MathUtils");
-  static auto fn           = class_helper.GetMethodInfo("GetMouseWorldPos");
+  static auto fn           = class_helper.GetInvokeMethod<vec3, void*, vec3*>("GetMouseWorldPos");
 
-  if (fn == nullptr || cam == nullptr || pos == nullptr) {
+  if (!fn || cam == nullptr || pos == nullptr) {
     return {0.0f, 0.0f, 0.0f};
   }
 
-  void            *args[2]   = {cam, (void *)pos};
-  Il2CppException *exception = nullptr;
-  auto             result    = il2cpp_runtime_invoke(fn, nullptr, args, &exception);
-  if (exception != nullptr || result == nullptr) {
+  const auto result = fn.Invoke(nullptr, cam, pos);
+  if (!result) {
     return {0.0f, 0.0f, 0.0f};
   }
-
-  auto unboxed = il2cpp_object_unbox(result);
-  return unboxed != nullptr ? *reinterpret_cast<vec3 *>(unboxed) : vec3{0.0f, 0.0f, 0.0f};
+  return *result;
 }
 
 auto do_default_zoom = false;

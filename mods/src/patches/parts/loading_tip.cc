@@ -49,12 +49,10 @@ void SetTMPText(void* tmpObj, const std::string& text)
   if (!tipStr) return;
 
   static auto tmp_h   = il2cpp_get_class_helper("Unity.TextMeshPro", "TMPro", "TMP_Text");
-  static auto fn_text = tmp_h.GetMethodInfo("set_text");
+  static auto fn_text = tmp_h.GetInvokeMethod<void, void*>("set_text");
   if (!fn_text) return;
 
-  void* args[1] = {tipStr};
-  Il2CppException* exception = nullptr;
-  il2cpp_runtime_invoke(fn_text, tmpObj, args, &exception);
+  static_cast<void>(fn_text.Invoke(tmpObj, tipStr));
 }
 
 static size_t g_lastCustomTipIdx = SIZE_MAX;

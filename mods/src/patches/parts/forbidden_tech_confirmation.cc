@@ -31,12 +31,10 @@ bool ConfirmForbiddenTechUpgrade(Il2CppDelegate* callback)
     return false;
   }
 
-  int32_t          result    = ConfirmButtonResult;
-  void*            args[]    = {&result};
-  Il2CppException* exception = nullptr;
-  il2cpp_runtime_invoke(callback->method, callback->target, args, &exception);
-
-  if (exception != nullptr) {
+  int32_t confirmResult = ConfirmButtonResult;
+  using ConfirmationInvoker = IL2CppClassHelper::InvokerMethod<void, int32_t>;
+  const auto invocation = ConfirmationInvoker(callback->method).Invoke(callback->target, confirmResult);
+  if (!invocation) {
     spdlog::warn("ForbiddenTechConfirmation: failed to invoke the confirmation callback");
     return false;
   }
