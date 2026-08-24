@@ -28,7 +28,7 @@ public:
 
   template <typename T> T* GetComponentFastPath2()
   {
-      static auto get_component = get_class_helper().GetMethodInfoSpecial("GetComponent", [](auto count, auto params) {
+    static auto get_component = get_class_helper().GetInvokeMethodSpecial<T*, void*>("GetComponent", [](auto count, auto params) {
       if (count != 1) {
         return false;
       }
@@ -41,15 +41,8 @@ public:
 
     static auto type = T::get_class_helper().GetType();
 
-    Il2CppException* exception = nullptr;
-    void*            params[1] = {type};
-    auto             result    = il2cpp_runtime_invoke(get_component, this, params, &exception);
-
-    if (exception) {
-      return nullptr;
-    } else {
-      return (T*)result;
-    }
+    const auto result = get_component.Invoke(this, type);
+    return result ? *result : nullptr;
   }
 
   template <typename T> T* GetComponentFastPath()

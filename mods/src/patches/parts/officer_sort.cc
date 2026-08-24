@@ -231,11 +231,10 @@ Il2CppClass* DiscoverFuncClassFromList(void* existingList)
   auto* getItem = il2cpp_class_get_method_from_name(listClass, "get_Item", 1);
   if (!getItem) return nullptr;
 
-  Il2CppException* exc        = nullptr;
-  int32_t          index      = 0;
-  void*            idxArgs[1] = {&index};
-  auto* firstOption = il2cpp_runtime_invoke(getItem, existingList, idxArgs, &exc);
-  if (exc || !firstOption) return nullptr;
+  int32_t index = 0;
+  const auto firstOptionResult = IL2CppClassHelper::InvokerMethod<void*, int32_t>(getItem).Invoke(existingList, index);
+  if (!firstOptionResult || !*firstOptionResult) return nullptr;
+  auto* firstOption = *firstOptionResult;
 
   auto& s = State();
   auto  sortingOptionField = s.processingOption->GetField("_sortingOption");
@@ -251,8 +250,8 @@ Il2CppClass* DiscoverFuncClassFromList(void* existingList)
   return il2cpp_object_get_class(ascendingDelegate);
 }
 
-// Called via invoker_method to bypass il2cpp_runtime_invoke, which fails for
-// static methods ("Delegate to an instance method cannot have null 'this'").
+// Called via invoker_method to bypass the regular managed invocation path,
+// which fails for static methods ("Delegate to an instance method cannot have null 'this'").
 Il2CppObject* CreateSortDelegate(const MethodInfo* sortMethod, Il2CppGCHandle& outHandle)
 {
   auto& s = State();
@@ -346,20 +345,19 @@ bool ListAlreadyHasBelowDeck(void* list)
   auto* getItem  = il2cpp_class_get_method_from_name(listClass, "get_Item", 1);
   if (!getCount || !getItem) return false;
 
-  Il2CppException* exc = nullptr;
-  auto* countObj = il2cpp_runtime_invoke(getCount, list, nullptr, &exc);
-  if (exc || !countObj) return false;
-  auto count = *reinterpret_cast<int32_t*>(il2cpp_object_unbox(countObj));
+  const auto countResult = IL2CppClassHelper::InvokerMethod<int32_t>(getCount).Invoke(list);
+  if (!countResult) return false;
+  const auto count = *countResult;
+  const auto getItemInvoker = IL2CppClassHelper::InvokerMethod<void*, int32_t>(getItem);
 
   auto& s = State();
   auto  displayKeyField = s.processingOption->GetField("_displayKey");
   if (!displayKeyField.isValidHelper()) return false;
 
   for (int32_t i = 0; i < count; ++i) {
-    void* idxArgs[1] = {&i};
-    exc = nullptr;
-    auto* option = il2cpp_runtime_invoke(getItem, list, idxArgs, &exc);
-    if (exc || !option) continue;
+    const auto optionResult = getItemInvoker.Invoke(list, i);
+    if (!optionResult || !*optionResult) continue;
+    auto* option = *optionResult;
 
     auto* keyPtr =
         *reinterpret_cast<Il2CppString**>(reinterpret_cast<char*>(option) + displayKeyField.offset());
@@ -412,10 +410,8 @@ void AppendBelowDeckOption(void* list, const char* displayKey, bool forRoster, v
     auto* sortersListClass = il2cpp_object_get_class(reinterpret_cast<Il2CppObject*>(sortersList));
     auto* sortersAddMethod = sortersListClass ? il2cpp_class_get_method_from_name(sortersListClass, "Add", 1) : nullptr;
     if (sortersAddMethod) {
-      void* sortersAddArgs[1] = {sortFn};
-      Il2CppException* sortersExc = nullptr;
-      il2cpp_runtime_invoke(sortersAddMethod, sortersList, sortersAddArgs, &sortersExc);
-      if (sortersExc) spdlog::warn("[OfficerSort] sorters list.Add raised an exception");
+      const auto invocation = IL2CppClassHelper::InvokerMethod<void, void*>(sortersAddMethod).Invoke(sortersList, sortFn);
+      if (!invocation) spdlog::warn("[OfficerSort] sorters list.Add raised an exception");
     }
   }
 
@@ -445,10 +441,8 @@ void AppendBelowDeckOption(void* list, const char* displayKey, bool forRoster, v
     return;
   }
 
-  void* addArgs[1] = {option};
-  Il2CppException* exc = nullptr;
-  il2cpp_runtime_invoke(addMethod, list, addArgs, &exc);
-  if (exc) spdlog::warn("[OfficerSort] list.Add raised an exception; below-deck option not inserted");
+  const auto invocation = IL2CppClassHelper::InvokerMethod<void, void*>(addMethod).Invoke(list, option);
+  if (!invocation) spdlog::warn("[OfficerSort] list.Add raised an exception; below-deck option not inserted");
 
   il2cpp_gchandle_free(optionHandle);
   il2cpp_gchandle_free(sortFnHandle);

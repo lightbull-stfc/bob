@@ -44,9 +44,9 @@ namespace {
 
 struct LocaleCache {
   Il2CppClass*        ltc_class           = nullptr; // LocaleTextContext
-  const MethodInfo*   ltc_ctor            = nullptr; // .ctor(string, string)
-  const MethodInfo*   ltc_apply_id_params = nullptr; // ApplyIdentifierParameters(object[])
-  const MethodInfo*   locale_localize     = nullptr; // LocaleUtilities.Localize(LTC, bool, bool)
+  IL2CppClassHelper::InvokerMethod<void, void*, void*> ltc_ctor;
+  IL2CppClassHelper::InvokerMethod<void, void*>        ltc_apply_id_params;
+  IL2CppClassHelper::InvokerMethod<Il2CppString*, void*, bool, bool> locale_localize;
   Il2CppClass*        object_array_class  = nullptr; // System.Object[]
   Il2CppClass*        int64_class         = nullptr; // System.Int64
 
@@ -62,25 +62,16 @@ void ensure_locale_cache()
   auto ltc = il2cpp_get_class_helper("Assembly-CSharp", "Digit.Client.UI", "LocaleTextContext");
   if (ltc.isValidHelper()) {
     s_locale.ltc_class           = ltc.get_cls();
-    s_locale.ltc_ctor            = ltc.GetMethodInfo(".ctor", 2);
-    s_locale.ltc_apply_id_params = ltc.GetMethodInfo("ApplyIdentifierParameters", 1);
+    s_locale.ltc_ctor            = ltc.GetInvokeMethod<void, void*, void*>(".ctor");
+    s_locale.ltc_apply_id_params = ltc.GetInvokeMethod<void, void*>("ApplyIdentifierParameters");
   }
   if (!s_locale.ltc_class || !s_locale.ltc_ctor || !s_locale.ltc_apply_id_params)
     spdlog::warn("[Notify] Could not resolve LocaleTextContext methods");
 
   auto lu = il2cpp_get_class_helper("Assembly-CSharp", "Digit.Client.Localization", "LocaleUtilities");
   if (lu.isValidHelper()) {
-    auto* cls = lu.get_cls();
-    if (cls) {
-      void* iter = nullptr;
-      while (auto* m = il2cpp_class_get_methods(cls, &iter)) {
-        if (std::string_view(il2cpp_method_get_name(m)) == "Localize" &&
-            il2cpp_method_get_param_count(m) == 3) {
-          s_locale.locale_localize = m;
-          break;
-        }
-      }
-    }
+    s_locale.locale_localize = lu.GetInvokeMethodSpecial<Il2CppString*, void*, bool, bool>(
+        "Localize", [](int param_count, const Il2CppType**) { return param_count == 3; });
   }
   if (!s_locale.locale_localize)
     spdlog::warn("[Notify] Could not resolve LocaleUtilities.Localize — falling back to parse_hull_key");
@@ -114,22 +105,13 @@ std::string localize(const char* identifier, const char* category, Il2CppObject*
         auto* ltc = il2cpp_object_new(s_locale.ltc_class);
         if (!ltc) return;
 
-        void* ctorParams[2] = {idStr, catStr};
-        Il2CppException* exc = nullptr;
-        il2cpp_runtime_invoke(s_locale.ltc_ctor, ltc, ctorParams, &exc);
-        if (exc) return;
-
-        void* applyParams[1] = {arr};
-        exc = nullptr;
-        il2cpp_runtime_invoke(s_locale.ltc_apply_id_params, ltc, applyParams, &exc);
-        if (exc) return;
+        if (!s_locale.ltc_ctor.Invoke(ltc, idStr, catStr)) return;
+        if (!s_locale.ltc_apply_id_params.Invoke(ltc, arr)) return;
 
         bool localText = false, invariant = false;
-        void* locParams[3] = {ltc, &localText, &invariant};
-        exc = nullptr;
-        auto* ret = il2cpp_runtime_invoke(s_locale.locale_localize, nullptr, locParams, &exc);
-        if (exc || !ret) return;
-        result = to_string(reinterpret_cast<Il2CppString*>(ret));
+        const auto ret = s_locale.locale_localize.Invoke(nullptr, ltc, localText, invariant);
+        if (!ret || !*ret) return;
+        result = to_string(*ret);
       }))
     spdlog::warn("[Notify] SEH: localize crashed for \"{}/{}\"", identifier, category);
   return result;
