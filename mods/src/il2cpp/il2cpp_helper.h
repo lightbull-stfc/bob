@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <expected>
 #include <memory>
 #include <type_traits>
 
@@ -15,8 +16,6 @@
 #include <il2cpp-object-internals.h>
 
 #include <utils/Il2CppHashMap.h>
-
-#include <spdlog/spdlog.h>
 
 #if !_WIN32
 #include <syslog.h>
@@ -197,7 +196,12 @@ public:
   template <typename R, typename... Args> class InvokerMethod
   {
   public:
-    using InvokeResult = std::conditional_t<std::is_void_v<R>, bool, R>;
+    struct VoidResult {
+    };
+
+    // InvokeResult contains the managed exception on failure; a null error means the method was invalid.
+    using InvokeValue  = std::conditional_t<std::is_void_v<R>, VoidResult, R>;
+    using InvokeResult = std::expected<InvokeValue, Il2CppException*>;
 
     InvokerMethod(const MethodInfo* fn = nullptr)
         : fn(fn)
@@ -209,29 +213,36 @@ public:
       return fn != nullptr;
     }
 
-    InvokeResult Invoke(void* _this, Args... args) const
+    // Non-throwing invocation for callers that need to inspect the exception or result.
+    InvokeResult Invoke(void* _this, Args... args) const noexcept
     {
-      if (!fn) return {};
+      if (!fn) return std::unexpected<Il2CppException*>(nullptr);
 
       Il2CppException* exception = nullptr;
       std::array<void*, sizeof...(Args)> params{ToParameter(args)...};
       auto* result = il2cpp_runtime_invoke(fn, _this, params.empty() ? nullptr : params.data(), &exception);
 
-      if (exception) {
-        char message[512] = {};
-        il2cpp_format_exception(exception, message, sizeof(message));
-        spdlog::error("Exception occurred while invoking method {}::{}: {}", fn->klass->name, fn->name, message);
-        return {};
-      }
+      if (exception) return std::unexpected<Il2CppException*>(exception);
 
       if constexpr (std::is_void_v<R>) {
-        return true;
+        return {};
       } else if constexpr (std::is_pointer_v<R>) {
         return reinterpret_cast<R>(result);
       } else {
-        if (!result) return {};
+        if (!result) return std::unexpected<Il2CppException*>(nullptr);
         auto* value = static_cast<R*>(il2cpp_object_unbox(result));
-        return value ? *value : R{};
+        if (!value) return std::unexpected<Il2CppException*>(nullptr);
+        return *value;
+      }
+    }
+
+    // Throwing convenience overload; failures raise std::bad_expected_access<Il2CppException*>.
+    R operator()(void* _this, Args... args) const
+    {
+      if constexpr (std::is_void_v<R>) {
+        static_cast<void>(Invoke(_this, args...).value());
+      } else {
+        return Invoke(_this, args...).value();
       }
     }
 
