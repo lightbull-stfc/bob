@@ -10,14 +10,14 @@ public:
   Il2CppObject* Get(int32_t index)
   {
     static auto GetImpl =
-        get_class_helper().GetMethodSpecial2<Il2CppObject*(IList*, int32_t)>((Il2CppObject*)(this), "get_Item");
+        get_class_helper().GetMethodFromObject<Il2CppObject*(IList*, int32_t)>(this, "get_Item");
     return GetImpl(this, index);
   }
 
   void RemoveAt(int32_t index)
   {
     static auto RemoveAtImpl =
-        get_class_helper().GetMethodSpecial2<void(IList*, int32_t)>((Il2CppObject*)(this), "RemoveAt");
+        get_class_helper().GetMethodFromObject<void(IList*, int32_t)>(this, "RemoveAt");
     if (RemoveAtImpl != nullptr) {
       RemoveAtImpl(this, index);
     }

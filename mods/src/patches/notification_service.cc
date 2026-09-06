@@ -21,9 +21,13 @@
 // ---------------------------------------------------------------------------
 // IL2CPP method cache
 // ---------------------------------------------------------------------------
-static const MethodInfo* s_localize_ltc    = nullptr; // LanguageManager.Localize(out string, LocaleTextContext) — instance
-static const MethodInfo* s_locale_utils_localize = nullptr; // LocaleUtilities.Localize(LocaleTextContext, bool, bool) — static
-static const MethodInfo* s_object_tostring = nullptr;
+using LocalizeInvoker = IL2CppClassHelper::InvokerMethod<bool, Il2CppString**, void*>;
+using LocaleUtilsLocalizeInvoker = IL2CppClassHelper::InvokerMethod<Il2CppString*, void*, bool, bool>;
+using ObjectToStringInvoker = IL2CppClassHelper::InvokerMethod<Il2CppString*>;
+
+static LocalizeInvoker            s_localize_ltc;
+static LocaleUtilsLocalizeInvoker s_locale_utils_localize;
+static const MethodInfo*          s_object_tostring = nullptr;
 
 // ---------------------------------------------------------------------------
 // Toast state → human-readable title
@@ -140,10 +144,9 @@ static std::string il2cpp_object_to_string(Il2CppObject* obj)
   auto* vm = il2cpp_object_get_virtual_method(obj, s_object_tostring);
   if (!vm) return {};
 
-  Il2CppException* exc = nullptr;
-  auto* result = reinterpret_cast<Il2CppString*>(il2cpp_runtime_invoke(vm, obj, nullptr, &exc));
-  if (exc || !result) return {};
-  return to_string(result);
+  const auto result = ObjectToStringInvoker(vm).Invoke(obj);
+  if (!result || !*result) return {};
+  return to_string(*result);
 }
 
 // ---------------------------------------------------------------------------
@@ -179,8 +182,8 @@ static Il2CppString* seh_to_string_raw(Il2CppObject* obj)
   if (!s_object_tostring) return nullptr;
   auto* vm = il2cpp_object_get_virtual_method(obj, s_object_tostring);
   if (!vm) return nullptr;
-  Il2CppException* exc = nullptr;
-  return reinterpret_cast<Il2CppString*>(il2cpp_runtime_invoke(vm, obj, nullptr, &exc));
+  const auto result = ObjectToStringInvoker(vm).Invoke(obj);
+  return result ? *result : nullptr;
 }
 
 static std::string safe_il2cpp_to_string(Il2CppObject* obj, il2cpp_array_size_t index)
@@ -312,20 +315,11 @@ static std::string resolve_toast_text(Toast* toast)
   // Try the static LocaleUtilities.Localize(LTC, bool, bool) first — it handles
   // parameter substitution internally and returns a fully formatted string.
   if (s_locale_utils_localize) {
-    void* params[3] = { ltc, nullptr, nullptr };
     // localizeTextParams = true, invariantCulture = false
-    bool localizeTextParams = true;
-    bool invariantCulture  = false;
-    params[1] = &localizeTextParams;
-    params[2] = &invariantCulture;
+    const auto ret = s_locale_utils_localize.Invoke(nullptr, ltc, true, false);
 
-    Il2CppException* exc = nullptr;
-    auto* ret = il2cpp_runtime_invoke(s_locale_utils_localize, nullptr, params, &exc);
-
-    if (exc) {
-      spdlog::warn("[Notify] LocaleUtilities.Localize threw exception");
-    } else if (ret) {
-      auto result = to_string(reinterpret_cast<Il2CppString*>(ret));
+    if (ret) {
+      auto result = to_string(*ret);
       // LocaleUtilities.Localize may return a template with unresolved {N}
       // placeholders if the LTC's own _textParameters are empty.  The actual
       // parameter values may be in Toast.TextParameters, so run
@@ -343,17 +337,9 @@ static std::string resolve_toast_text(Toast* toast)
     auto* langMgr = LanguageManager::Instance();
     if (!langMgr) return {};
 
-    Il2CppString*  resolved = nullptr;
-    void*          params[2] = { &resolved, ltc };
-    Il2CppException* exc = nullptr;
-    auto* ret = il2cpp_runtime_invoke(s_localize_ltc, langMgr, params, &exc);
-
-    if (exc) {
-      spdlog::warn("[Notify] LanguageManager.Localize threw exception");
-      return {};
-    }
-
-    bool success = ret ? (*static_cast<bool*>(il2cpp_object_unbox(ret))) : false;
+    Il2CppString* resolved = nullptr;
+    const auto result = s_localize_ltc.Invoke(langMgr, &resolved, ltc);
+    bool       success = result ? *result : false;
     if (!success || !resolved) {
       spdlog::debug("[Notify] LanguageManager.Localize returned false for toast state {}", toast->get_State());
       return {};
@@ -453,18 +439,8 @@ void notification_init()
   // 2-parameter overload that takes an LTC and returns a localized string.
   auto lm_helper = il2cpp_get_class_helper("Assembly-CSharp", "Digit.Client.Localization", "LanguageManager");
   if (lm_helper.isValidHelper()) {
-    auto* cls = lm_helper.get_cls();
-    if (cls) {
-      void* iter = nullptr;
-      while (auto* method = il2cpp_class_get_methods(cls, &iter)) {
-        auto name = std::string_view(il2cpp_method_get_name(method));
-        auto pc   = il2cpp_method_get_param_count(method);
-        if (name == "Localize" && pc == 2) {
-          s_localize_ltc = method;
-          break;
-        }
-      }
-    }
+    s_localize_ltc = lm_helper.GetInvokeMethodSpecial<bool, Il2CppString**, void*>(
+        "Localize", [](int param_count, const Il2CppType**) { return param_count == 2; });
   }
 
   if (!s_localize_ltc) {
@@ -475,18 +451,8 @@ void notification_init()
   // that handles parameter substitution internally and returns a fully formatted string.
   auto lu_helper = il2cpp_get_class_helper("Assembly-CSharp", "Digit.Client.Localization", "LocaleUtilities");
   if (lu_helper.isValidHelper()) {
-    auto* cls = lu_helper.get_cls();
-    if (cls) {
-      void* iter = nullptr;
-      while (auto* method = il2cpp_class_get_methods(cls, &iter)) {
-        auto name = std::string_view(il2cpp_method_get_name(method));
-        auto pc   = il2cpp_method_get_param_count(method);
-        if (name == "Localize" && pc == 3) {
-          s_locale_utils_localize = method;
-          break;
-        }
-      }
-    }
+    s_locale_utils_localize = lu_helper.GetInvokeMethodSpecial<Il2CppString*, void*, bool, bool>(
+        "Localize", [](int param_count, const Il2CppType**) { return param_count == 3; });
   }
 
   if (!s_locale_utils_localize) {

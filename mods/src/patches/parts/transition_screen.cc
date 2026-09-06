@@ -126,13 +126,11 @@ static void ApplyTransitionCustomization(void* _this)
       static auto tv_h = il2cpp_get_class_helper("Assembly-CSharp", "Digit.Prime.LoadingScreen", "TransitionViewController");
       static auto fn_animField = tv_h.GetField("_animator");
       static auto behav_h      = il2cpp_get_class_helper("UnityEngine.CoreModule", "UnityEngine", "Behaviour");
-      static auto fn_setEn     = behav_h.GetMethodInfo("set_enabled");
+      static auto fn_setEn     = behav_h.GetInvokeMethod<void, bool>("set_enabled");
       if (fn_animField.isValidHelper() && fn_setEn) {
         void* anim = *reinterpret_cast<void**>((char*)_this + fn_animField.offset());
         if (anim) {
-          bool  off     = false;
-          void* args[1] = {&off};
-          ls::InvokeVoid(fn_setEn, anim, args, "canvasAnimator.set_enabled(false)");
+          static_cast<void>(fn_setEn.Invoke(anim, false));
           g_canvasAnimator = anim;
         }
       }
@@ -166,17 +164,15 @@ static void ApplyTransitionCustomization(void* _this)
       if (g_bgRectTransform) {
         ls::SetFullRect(g_bgRectTransform, {0.0f, 0.0f}, {1.0f, 1.0f}, {0.5f, 0.5f}, {0.0f, 0.0f}, {0.0f, 0.0f});
         static auto tr_h = il2cpp_get_class_helper("UnityEngine.CoreModule", "UnityEngine", "Transform");
-        static auto fn_eu = tr_h.GetMethodInfo("set_localEulerAngles");
+        static auto fn_eu = tr_h.GetInvokeMethod<void, ls::FakeVector3>("set_localEulerAngles");
         if (fn_eu) {
           ls::FakeVector3 z{0, 0, 0};
-          void* args[1] = {&z};
-          ls::InvokeVoid(fn_eu, g_bgRectTransform, args, "Transform.set_localEulerAngles");
+          static_cast<void>(fn_eu.Invoke(g_bgRectTransform, z));
         }
-        static auto fn_sc = tr_h.GetMethodInfo("set_localScale");
+        static auto fn_sc = tr_h.GetInvokeMethod<void, ls::FakeVector3>("set_localScale");
         if (fn_sc) {
           ls::FakeVector3 o{1, 1, 1};
-          void* args[1] = {&o};
-          ls::InvokeVoid(fn_sc, g_bgRectTransform, args, "Transform.set_localScale");
+          static_cast<void>(fn_sc.Invoke(g_bgRectTransform, o));
         }
       }
 
@@ -273,11 +269,9 @@ static void TVC_AboutToHide_Hook(auto original, void* _this)
     if (Config::Get().loader_transition && g_canvasAnimator) {
       // Re-enable canvas animator so the hide animation plays
       static auto behav_h  = il2cpp_get_class_helper("UnityEngine.CoreModule", "UnityEngine", "Behaviour");
-      static auto fn_setEn = behav_h.GetMethodInfo("set_enabled");
+      static auto fn_setEn = behav_h.GetInvokeMethod<void, bool>("set_enabled");
       if (fn_setEn) {
-        bool  on      = true;
-        void* args[1] = {&on};
-        ls::InvokeVoid(fn_setEn, g_canvasAnimator, args, "canvasAnimator.set_enabled(true)");
+        static_cast<void>(fn_setEn.Invoke(g_canvasAnimator, true));
       }
     }
   } catch (...) {}
