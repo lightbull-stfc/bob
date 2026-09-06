@@ -13,6 +13,13 @@ namespace Audio
   constexpr bool        trace_events    = false;
 } // namespace Audio
 
+namespace BattleCsvExport
+{
+  constexpr bool        enabled         = false;
+  constexpr bool        export_existing = false;
+  constexpr const char* directory       = "";
+} // namespace BattleCsvExport
+
 namespace SystemConfig
 {
   constexpr const char* assets_url_override = "";
